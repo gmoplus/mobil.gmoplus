@@ -37,7 +37,7 @@ define('RL_AJAX_DEBUG', getenv('AJAX_DEBUG') === 'true' ? true : false);
 define('RL_DBPORT', getenv('DB_PORT') ?: '3306');
 define('RL_DBHOST', getenv('DB_HOST') ?: 'localhost');
 define('RL_DBUSER', getenv('DB_USER') ?: 'gmoplus_mobiluser');
-define('RL_DBPASS', getenv('DB_PASS') ?: 'gmoplus_mobiluser1234');
+define('RL_DBPASS', getenv('DB_PASS') ?: getenv('DB_PASSWORD') ?: 'gmoplus_mobiluser1234');
 define('RL_DBNAME', getenv('DB_NAME') ?: 'gmoplus_mobil');
 define('RL_DBPREFIX', getenv('DB_PREFIX') ?: 'fl_');
 
