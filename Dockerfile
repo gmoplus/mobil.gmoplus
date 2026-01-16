@@ -73,8 +73,4 @@ RUN echo "ServerName localhost" >> /etc/apache2/apache2.conf
 
 # Expose port 80
 EXPOSE 80
-
-# Disable healthcheck - Coolify handles this
-HEALTHCHECK NONE
-
 CMD ["apache2-foreground"]
