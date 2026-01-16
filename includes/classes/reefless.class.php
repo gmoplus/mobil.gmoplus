@@ -447,8 +447,7 @@ class reefless extends rlDb
                     $content .= '<img alt="" title="' . $file_name . '" style="' . $resize_type;
                     $content .= ': 250px;" src="' . RL_URL_HOME . 'tmp/upload/' . $file_name . '" />';
                 }
-                /* print file */
-                else {
+                /* print file */ else {
                     $file_name_display = substr($file_name, strpos($file_name, '_') + 1);
                     $content .= '<span style="font-style:italic;" title="' . $file_name . '"><b>' . $file_name_display . '</b></span>';
                 }
@@ -479,8 +478,7 @@ class reefless extends rlDb
                 $content .= '<img class="thumbnail" alt="" title="' . $file_name . '" style="' . $resize_type;
                 $content .= ': 250px;" src="' . RL_URL_HOME . 'tmp/upload/' . $file_name . '" />';
             }
-            /* print file */
-            else {
+            /* print file */ else {
                 $file_name_display = substr($file_name, strpos($file_name, '_') + 1);
                 $content = '<span style="font-style:italic;" title="' . $file_name . '"><b>' . $file_name_display . '</b></span>';
             }
@@ -910,7 +908,7 @@ class reefless extends rlDb
         $sql = "SELECT `IP` AS `Count` FROM `{db_prefix}login_attempts` ";
         $sql .= "WHERE `IP` = '{$client_ip}' AND `Status` = 'fail' AND `Interface` = '{$mode}' ";
         $sql .= "GROUP BY `Date` ";
-        $sql .= "HAVING TIMESTAMPDIFF(HOUR, `Date`, NOW()) < {$config['security_login_attempt_' . $mode . '_period']} ";
+        $sql .= "HAVING TIMESTAMPDIFF(HOUR, `Date`, NOW()) < {$config['security_login_attempt_' .$mode . '_period']} ";
 
         $attempts = $this->getAll($sql);
         $count = count($attempts);
@@ -974,13 +972,27 @@ class reefless extends rlDb
 
         // array of bots
         $bots = array(
-            "google", "bot", "radian",
-            "yahoo", "spider", "crawl",
-            "archiver", "curl", "yandex",
-            "python", "nambu", "eventbox",
-            "twitt", "perl", "monitor",
-            "sphere", "PEAR", "mechanize",
-            "java", "wordpress", "facebookexternal",
+            "google",
+            "bot",
+            "radian",
+            "yahoo",
+            "spider",
+            "crawl",
+            "archiver",
+            "curl",
+            "yandex",
+            "python",
+            "nambu",
+            "eventbox",
+            "twitt",
+            "perl",
+            "monitor",
+            "sphere",
+            "PEAR",
+            "mechanize",
+            "java",
+            "wordpress",
+            "facebookexternal",
             "^PHP",
         );
 
@@ -1071,7 +1083,8 @@ class reefless extends rlDb
             $firstNonModrewriteSign = '&';
         }
 
-        if (defined('REALM') && REALM == 'admin'
+        if (
+            defined('REALM') && REALM == 'admin'
             && !$config['mod_rewrite']
             && false === strpos($url, 'index.php')
         ) {
@@ -1094,7 +1107,8 @@ class reefless extends rlDb
                     }
                     break;
                 case 'listing':
-                    if (isset($data['Listing_type'])
+                    if (
+                        isset($data['Listing_type'])
                         && isset($listing_type)
                         && $listing_type['Key'] === $data['Listing_type']
                     ) {
@@ -1113,7 +1127,8 @@ class reefless extends rlDb
                     $pages[$page_info['Key']] = $page_info["Path_{$customLang}"]
                         ?: ($page_info["Path_{$config['lang']}"] ?: $page_info['Path']);
                 }
-            } elseif (!$pages
+            } elseif (
+                !$pages
                 || (defined('RL_LANG_CODE') && $customLang !== RL_LANG_CODE)
                 || (!defined('RL_LANG_CODE') && $customLang !== $config['lang'])
             ) {
@@ -1186,7 +1201,10 @@ class reefless extends rlDb
                     $category_info = $rlDb->fetch(
                         ['Path', 'Type'],
                         ['ID' => $listing['Category_ID']],
-                        null, null, 'categories', 'row'
+                        null,
+                        null,
+                        'categories',
+                        'row'
                     );
 
                     $listing['Listing_type'] = $listing['Listing_type'] ?: $category_info['Type'];
@@ -1276,10 +1294,11 @@ class reefless extends rlDb
 
                 if ($path || $data['key'] === 'home') {
                     $listingTypeData = 0 === strpos($pageKey, 'lt_')
-                    ? $rlListingTypes->types[str_replace('lt_', '', $pageKey)]
-                    : null;
+                        ? $rlListingTypes->types[str_replace('lt_', '', $pageKey)]
+                        : null;
 
-                    if ($listingTypeData
+                    if (
+                        $listingTypeData
                         && $listingTypeData['Links_type'] === 'subdomain'
                         && $config['mod_rewrite']
                     ) {
@@ -1290,8 +1309,8 @@ class reefless extends rlDb
                         $url .= $addVars;
                     } else {
                         $url .= $config['mod_rewrite']
-                        ? $path . $addUrl . ($path ? '.html' : '') . $addVars
-                        : $firstNonModrewriteSign . 'page=' . $path . $addUrl . $addVars;
+                            ? $path . $addUrl . ($path ? '.html' : '') . $addVars
+                            : $firstNonModrewriteSign . 'page=' . $path . $addUrl . $addVars;
                     }
                 }
                 break;
@@ -1320,13 +1339,14 @@ class reefless extends rlDb
                 if ($config['multilingual_paths']) {
                     if (isset($category["Path_{$lang}"])) {
                         $multilingualPath = !empty($category["Path_{$lang}"])
-                        ? $category["Path_{$lang}"]
-                        : $categoryPath;
+                            ? $category["Path_{$lang}"]
+                            : $categoryPath;
                     } else {
                         $multilingualPath = null;
                     }
 
-                    if ($GLOBALS["categories_{$lang}"][$categoryID]
+                    if (
+                        $GLOBALS["categories_{$lang}"][$categoryID]
                         || ($GLOBALS['category']["Path_{$lang}"] && $GLOBALS['category']['Key'] === $data['Key'])
                     ) {
                         if ($GLOBALS['category']["Path_{$lang}"] && !$GLOBALS["categories_{$lang}"][$categoryID]) {
@@ -1611,17 +1631,31 @@ class reefless extends rlDb
      * Determine if HTTPS is used
      *
      * @since 4.6.0
+     * @modified for Coolify/Docker support
      *
      * @return bool
      */
     public function isHttps()
     {
         $https = false;
+
+        // Standard HTTPS detection
         if (isset($_SERVER['HTTPS']) && (strtolower($_SERVER['HTTPS']) == 'on' || $_SERVER['HTTPS'] === '1')) {
             $https = true;
         } else if (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == '443') {
             $https = true;
         } else if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {
+            $https = true;
+        } else if (isset($_SERVER['HTTP_X_FORWARDED_SSL']) && $_SERVER['HTTP_X_FORWARDED_SSL'] === 'on') {
+            $https = true;
+        }
+        // Coolify/Docker: Check if SITE_URL or RL_URL_HOME starts with https
+        // This means we're behind a reverse proxy that handles SSL
+        else if (getenv('SITE_URL') && strpos(getenv('SITE_URL'), 'https://') === 0) {
+            $https = true;
+        } else if (getenv('APP_URL') && strpos(getenv('APP_URL'), 'https://') === 0) {
+            $https = true;
+        } else if (defined('RL_URL_HOME') && strpos(RL_URL_HOME, 'https://') === 0) {
             $https = true;
         }
 
