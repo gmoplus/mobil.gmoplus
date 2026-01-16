@@ -1,0 +1,822 @@
+<?php
+
+/******************************************************************************
+ *  
+ *  PROJECT: GMO Plus Mobil - Quote System
+ *  VERSION: 1.0.0
+ *  LICENSE: GMO Plus Internal Use
+ *  DOMAIN: mobil.gmoplus.com
+ *  FILE: rlQuoteSystem.class.php
+ *  
+ *  GMO Plus Teklif Alma Sistemi
+ *  
+ ******************************************************************************/
+
+/**
+ * Quote System Class
+ * Hizmet ilanları için teklif alma sistemi
+ */
+class rlQuoteSystem
+{
+    /**
+     * Class instance
+     */
+    private static $instance = null;
+    
+    /**
+     * Database connection
+     */
+    private $db;
+    
+    /**
+     * Quote forms cache
+     */
+    private $forms = array();
+    
+    /**
+     * Configuration cache
+     */
+    private $config = array();
+
+    /**
+     * Constructor
+     */
+    public function __construct()
+    {
+        global $rlDb;
+        $this->db = $rlDb;
+        $this->loadConfig();
+    }
+    
+    /**
+     * Get instance (singleton)
+     */
+    public static function getInstance()
+    {
+        if (self::$instance === null) {
+            self::$instance = new self();
+        }
+        return self::$instance;
+    }
+    
+    /**
+     * Load system configuration
+     */
+    private function loadConfig()
+    {
+        $configs = $this->db->fetch('*', array(), '', null, 'quote_config');
+        
+        foreach ($configs as $config) {
+            $value = $config['config_value'];
+            
+            // Type conversion
+            switch ($config['config_type']) {
+                case 'boolean':
+                    $value = (bool) $value;
+                    break;
+                case 'number':
+                    $value = (int) $value;
+                    break;
+                case 'json':
+                    $value = json_decode($value, true);
+                    break;
+            }
+            
+            $this->config[$config['config_key']] = $value;
+        }
+    }
+    
+    /**
+     * Parse SQL with placeholders
+     */
+    private function parseSQL($sql)
+    {
+        return str_replace('{db_prefix}', RL_DBPREFIX, $sql);
+    }
+    
+    /**
+     * Get configuration value
+     */
+    public function getConfig($key, $default = null)
+    {
+        return isset($this->config[$key]) ? $this->config[$key] : $default;
+    }
+    
+    /**
+     * Set configuration value
+     */
+    public function setConfig($key, $value, $type = 'text')
+    {
+        $this->config[$key] = $value;
+        
+        // Type conversion for database
+        switch ($type) {
+            case 'boolean':
+                $db_value = $value ? '1' : '0';
+                break;
+            case 'json':
+                $db_value = json_encode($value);
+                break;
+            default:
+                $db_value = (string) $value;
+        }
+        
+        // Update or insert config
+        $sql = $this->parseSQL("
+            SELECT config_key 
+            FROM `{db_prefix}quote_config` 
+            WHERE `config_key` = '{$key}'
+        ");
+        $existing = $this->db->getRow($sql);
+        
+        if ($existing) {
+            $update_sql = $this->parseSQL("
+                UPDATE `{db_prefix}quote_config` 
+                SET `config_value` = '{$db_value}', `config_type` = '{$type}' 
+                WHERE `config_key` = '{$key}'
+            ");
+            $this->db->query($update_sql);
+        } else {
+            $insert_sql = $this->parseSQL("
+                INSERT INTO `{db_prefix}quote_config` 
+                (`config_key`, `config_value`, `config_type`) 
+                VALUES ('{$key}', '{$db_value}', '{$type}')
+            ");
+            $this->db->query($insert_sql);
+        }
+        
+        return true;
+    }
+    
+    /**
+     * Check if quote system is enabled
+     */
+    public function isEnabled()
+    {
+        return $this->getConfig('quote_system_enabled', false);
+    }
+    
+    /**
+     * Get quote form for category
+     */
+    public function getFormByCategory($category_key)
+    {
+        if (!isset($this->forms[$category_key])) {
+            $sql = $this->parseSQL("
+                SELECT * FROM `{db_prefix}quote_forms` 
+                WHERE `category_key` = '" . addslashes($category_key) . "' 
+                AND `status` = 'active'
+            ");
+            $form = $this->db->getRow($sql);
+            
+            // If no specific form found, try fallback to 'hizmet'
+            if (!$form && $category_key !== 'hizmet') {
+                $sql = $this->parseSQL("
+                    SELECT * FROM `{db_prefix}quote_forms` 
+                    WHERE `category_key` = 'hizmet' 
+                    AND `status` = 'active'
+                ");
+                $form = $this->db->getRow($sql);
+            }
+            
+            if ($form) {
+                // Load form fields
+                $fields = $this->db->fetch('*', 
+                    array('form_id' => $form['id'], 'status' => 'active'),
+                    'ORDER BY `order_position` ASC',
+                    null,
+                    'quote_fields'
+                );
+                
+                // Parse field options
+                foreach ($fields as &$field) {
+                    if ($field['field_options']) {
+                        $field['options'] = json_decode($field['field_options'], true);
+                    }
+                }
+                
+                $form['fields'] = $fields;
+                $this->forms[$category_key] = $form;
+            } else {
+                $this->forms[$category_key] = false;
+            }
+        }
+        
+        return $this->forms[$category_key];
+    }
+    
+    /**
+     * Get quote form for listing (with category detection)
+     */
+    public function getQuoteForm($listing_id)
+    {
+        // Get listing category
+        $category = $this->getListingCategory($listing_id);
+        
+        if (!$category) {
+            return false;
+        }
+        
+        // Get form by category
+        $form = $this->getFormByCategory($category['category_key']);
+        
+        if ($form) {
+            $form['listing_info'] = $category;
+        }
+        
+        return $form;
+    }
+    
+    /**
+     * Get quote form by ID
+     */
+    public function getFormById($form_id)
+    {
+        $sql = $this->parseSQL("
+            SELECT * FROM `{db_prefix}quote_forms` 
+            WHERE `id` = {$form_id}
+        ");
+        $form = $this->db->getRow($sql);
+        
+        if ($form) {
+            $fields = $this->db->fetch('*', 
+                array('form_id' => $form_id, 'status' => 'active'),
+                'ORDER BY `order_position` ASC',
+                null,
+                'quote_fields'
+            );
+            
+            foreach ($fields as &$field) {
+                if ($field['field_options']) {
+                    $field['options'] = json_decode($field['field_options'], true);
+                }
+            }
+            
+            $form['fields'] = $fields;
+        }
+        
+        return $form;
+    }
+    
+    /**
+     * Get listing category info
+     */
+    public function getListingCategory($listing_id)
+    {
+        $sql = $this->parseSQL("
+            SELECT l.Category_ID, c.Key as category_key, l.title as listing_title, l.Status
+            FROM `{db_prefix}listings` l
+            LEFT JOIN `{db_prefix}categories` c ON l.Category_ID = c.ID
+            WHERE l.ID = {$listing_id} AND l.Status = 'active'
+        ");
+        
+        return $this->db->getRow($sql);
+    }
+    
+    /**
+     * Check if listing has quote form
+     */
+    public function hasQuoteForm($listing_id)
+    {
+        $category = $this->getListingCategory($listing_id);
+        
+        if (!$category) {
+            return false;
+        }
+        
+        $form = $this->getFormByCategory($category['category_key']);
+        return $form !== false;
+    }
+    
+    /**
+     * Validate form data
+     */
+    public function validateSubmission($form_id, $data)
+    {
+        $form = $this->getFormById($form_id);
+        $errors = array();
+        
+        if (!$form) {
+            $errors[] = 'Geçersiz form';
+            return $errors;
+        }
+        
+        // Validate required basic fields
+        if (empty($data['requester_name'])) {
+            $errors[] = 'Ad Soyad zorunludur';
+        }
+        
+        if (empty($data['requester_email']) || !filter_var($data['requester_email'], FILTER_VALIDATE_EMAIL)) {
+            $errors[] = 'Geçerli bir email adresi gereklidir';
+        }
+        
+        // Validate form fields
+        foreach ($form['fields'] as $field) {
+            $field_value = isset($data['form_data'][$field['field_key']]) ? $data['form_data'][$field['field_key']] : '';
+            
+            // Required field check
+            if ($field['is_required'] && empty($field_value)) {
+                $errors[] = $field['field_name'] . ' zorunludur';
+                continue;
+            }
+            
+            // Type validation
+            if (!empty($field_value)) {
+                switch ($field['field_type']) {
+                    case 'email':
+                        if (!filter_var($field_value, FILTER_VALIDATE_EMAIL)) {
+                            $errors[] = $field['field_name'] . ' geçerli bir email olmalıdır';
+                        }
+                        break;
+                    case 'number':
+                        if (!is_numeric($field_value)) {
+                            $errors[] = $field['field_name'] . ' sayı olmalıdır';
+                        }
+                        break;
+                    case 'phone':
+                        if (!preg_match('/^[\d\s\-\+\(\)]+$/', $field_value)) {
+                            $errors[] = $field['field_name'] . ' geçerli bir telefon numarası olmalıdır';
+                        }
+                        break;
+                }
+            }
+        }
+        
+        return $errors;
+    }
+    
+    /**
+     * Submit quote request
+     */
+    public function submitQuote($data)
+    {
+        // Validate input
+        $errors = $this->validateSubmission($data['form_id'], $data);
+        if (!empty($errors)) {
+            return array('success' => false, 'errors' => $errors);
+        }
+        
+        // Rate limiting check
+        if (!$this->checkRateLimit($data['requester_email'])) {
+            return array('success' => false, 'errors' => array('Günlük teklif limiti aşıldı'));
+        }
+        
+        // Get listing owner
+        $sql = $this->parseSQL("
+            SELECT Account_ID 
+            FROM `{db_prefix}listings` 
+            WHERE `ID` = {$data['listing_id']}
+        ");
+        $result = $this->db->getRow($sql);
+        $listing_owner = $result ? $result['Account_ID'] : null;
+        
+        if (!$listing_owner) {
+            return array('success' => false, 'errors' => array('İlan bulunamadı'));
+        }
+        
+        // Prepare submission data
+        $submission_data = array(
+            'form_id' => $data['form_id'],
+            'listing_id' => $data['listing_id'],
+            'category_id' => $data['category_id'],
+            'listing_owner_id' => $listing_owner,
+            'requester_name' => $data['requester_name'],
+            'requester_email' => $data['requester_email'],
+            'requester_phone' => isset($data['requester_phone']) ? $data['requester_phone'] : '',
+            'quote_message' => isset($data['quote_message']) ? $data['quote_message'] : '',
+            'form_data' => json_encode($data['form_data'], JSON_UNESCAPED_UNICODE),
+            'ip_address' => $_SERVER['REMOTE_ADDR'],
+            'user_agent' => $_SERVER['HTTP_USER_AGENT']
+        );
+        
+        // Insert submission
+        $fields = array_keys($submission_data);
+        $values = array_values($submission_data);
+        
+        // Escape values using Flynax Valid class
+        $escaped_values = array();
+        $rlValid = new rlValid();
+        
+        foreach ($values as $value) {
+            if (is_null($value)) {
+                $escaped_values[] = 'NULL';
+            } else {
+                $escaped_value = $value;
+                $rlValid->escapeString($escaped_value);
+                $escaped_values[] = "'" . $escaped_value . "'";
+            }
+        }
+        
+        $insert_sql = $this->parseSQL("
+            INSERT INTO `{db_prefix}quote_submissions` 
+            (`" . implode('`, `', $fields) . "`) 
+            VALUES (" . implode(', ', $escaped_values) . ")
+        ");
+        
+        try {
+            $this->db->query($insert_sql);
+            $submission_id = $this->db->insertID();
+        } catch (Exception $e) {
+            error_log("Quote submission insert failed: " . $e->getMessage());
+            error_log("SQL: " . $insert_sql);
+            throw new Exception("Veritabanı kayıt hatası: " . $e->getMessage());
+        }
+        
+        if ($submission_id) {
+            // Send notifications (email sending disabled for stability)
+            // Email bildirimler manuel olarak gönderilecek
+            
+            return array('success' => true, 'submission_id' => $submission_id);
+        } else {
+            return array('success' => false, 'errors' => array('Teklif gönderilemedi, lütfen tekrar deneyin'));
+        }
+    }
+    
+    /**
+     * Check rate limiting
+     */
+    private function checkRateLimit($email)
+    {
+        $max_per_day = $this->getConfig('max_submissions_per_day', 10);
+        $today = date('Y-m-d');
+        
+        $sql = $this->parseSQL("
+            SELECT COUNT(*) as count 
+            FROM `{db_prefix}quote_submissions` 
+            WHERE `requester_email` = '{$email}' 
+            AND `created_date` > '{$today} 00:00:00'
+        ");
+        
+        $result = $this->db->getRow($sql);
+        $count = $result ? $result['count'] : 0;
+        
+        // Return true if UNDER limit (can submit), false if OVER limit (blocked)
+        return $count < $max_per_day;
+    }
+    
+    /**
+     * Send email notifications
+     */
+    private function sendNotifications($submission_id)
+    {
+        $sql = $this->parseSQL("
+            SELECT s.*, f.form_name, f.email_template, f.auto_reply_subject, f.auto_reply_message,
+                   l.title as listing_title, a.Mail as owner_email, a.First_name, a.Last_name
+            FROM `{db_prefix}quote_submissions` s
+            LEFT JOIN `{db_prefix}quote_forms` f ON s.form_id = f.id
+            LEFT JOIN `{db_prefix}listings` l ON s.listing_id = l.ID
+            LEFT JOIN `{db_prefix}accounts` a ON s.listing_owner_id = a.ID
+            WHERE s.id = {$submission_id}
+        ");
+        $submission = $this->db->getRow($sql);
+        
+        if (!$submission) return false;
+        
+        // Send to listing owner
+        $this->sendOwnerNotification($submission);
+        
+        // Send auto-reply to requester
+        if ($this->getConfig('send_auto_reply', true)) {
+            $this->sendAutoReply($submission);
+        }
+        
+        // Send to admin if configured
+        $admin_email = $this->getConfig('admin_notification_email');
+        if ($admin_email) {
+            $this->sendAdminNotification($submission, $admin_email);
+        }
+        
+        return true;
+    }
+    
+    /**
+     * Send notification to listing owner
+     */
+    private function sendOwnerNotification($submission)
+    {
+        global $rlMail;
+        
+        $form_data = json_decode($submission['form_data'], true);
+        $form = $this->getFormById($submission['form_id']);
+        
+        // Build form data HTML
+        $form_html = '<table border="1" cellpadding="5" cellspacing="0">';
+        foreach ($form['fields'] as $field) {
+            $value = isset($form_data[$field['field_key']]) ? $form_data[$field['field_key']] : '-';
+            $form_html .= '<tr><td><strong>' . $field['field_name'] . ':</strong></td><td>' . htmlspecialchars($value) . '</td></tr>';
+        }
+        $form_html .= '</table>';
+        
+        $subject = str_replace('{service_name}', $submission['listing_title'], $this->getConfig('default_email_subject'));
+        
+        $body = "
+        <h2>Yeni Teklif Talebi</h2>
+        <p><strong>İlan:</strong> {$submission['listing_title']}</p>
+        <p><strong>Talep Eden:</strong> {$submission['requester_name']}</p>
+        <p><strong>Email:</strong> {$submission['requester_email']}</p>
+        <p><strong>Telefon:</strong> {$submission['requester_phone']}</p>
+        <p><strong>Tarih:</strong> {$submission['created_date']}</p>
+        
+        <h3>Teklif Detayları:</h3>
+        {$form_html}
+        
+        <p>Bu talebi yanıtlamak için lütfen müşteri ile iletişime geçin.</p>
+        ";
+        
+        $rlMail->send($submission['owner_email'], $subject, $body, $submission['requester_email']);
+    }
+    
+    /**
+     * Send auto-reply to requester
+     */
+    private function sendAutoReply($submission)
+    {
+        global $rlMail;
+        
+        $subject = $submission['auto_reply_subject'] ?: 'Teklif Talebiniz Alındı';
+        $message = $submission['auto_reply_message'] ?: 'Teklif talebiniz başarıyla alındı. En kısa sürede size dönüş yapılacaktır.';
+        
+        $body = "
+        <h2>Teklif Talebiniz Alındı</h2>
+        <p>Sayın {$submission['requester_name']},</p>
+        <p>{$message}</p>
+        <p><strong>İlan:</strong> {$submission['listing_title']}</p>
+        <p><strong>Talep Tarihi:</strong> {$submission['created_date']}</p>
+        <p>Teşekkürler.</p>
+        ";
+        
+        $rlMail->send($submission['requester_email'], $subject, $body);
+    }
+    
+    /**
+     * Send admin notification
+     */
+    private function sendAdminNotification($submission, $admin_email)
+    {
+        global $rlMail;
+        
+        $subject = "Yeni Teklif Talebi - Admin Bildirimi";
+        $body = "
+        <h2>Yeni Teklif Talebi</h2>
+        <p><strong>İlan:</strong> {$submission['listing_title']}</p>
+        <p><strong>Kategori:</strong> {$submission['form_name']}</p>
+        <p><strong>Talep Eden:</strong> {$submission['requester_name']} ({$submission['requester_email']})</p>
+        <p><strong>Tarih:</strong> {$submission['created_date']}</p>
+        
+        <p>Detaylar için admin paneli kontrol edin.</p>
+        ";
+        
+        $rlMail->send($admin_email, $subject, $body);
+    }
+    
+    /**
+     * Get submissions by listing owner
+     */
+    public function getSubmissionsByOwner($owner_id, $limit = 20, $offset = 0)
+    {
+        $sql = $this->parseSQL("
+            SELECT s.*, f.form_name, l.title as listing_title
+            FROM `{db_prefix}quote_submissions` s
+            LEFT JOIN `{db_prefix}quote_forms` f ON s.form_id = f.id
+            LEFT JOIN `{db_prefix}listings` l ON s.listing_id = l.ID
+            WHERE s.listing_owner_id = {$owner_id}
+            ORDER BY s.created_date DESC
+            LIMIT {$offset}, {$limit}
+        ");
+        
+        return $this->db->getAll($sql);
+    }
+    
+    /**
+     * Get all quote forms for admin
+     */
+    public function getAllForms()
+    {
+        return $this->db->fetch('*', array(), 'ORDER BY `created_date` DESC', null, 'quote_forms');
+    }
+    
+    /**
+     * Get all submissions for admin
+     */
+    public function getAllSubmissions($limit = 50, $offset = 0, $status = null)
+    {
+        $where = '';
+        if ($status) {
+            $where = "WHERE s.status = '{$status}'";
+        }
+        
+        $sql = $this->parseSQL("
+            SELECT s.*, f.form_name, l.title as listing_title, a.First_name, a.Last_name
+            FROM `{db_prefix}quote_submissions` s
+            LEFT JOIN `{db_prefix}quote_forms` f ON s.form_id = f.id
+            LEFT JOIN `{db_prefix}listings` l ON s.listing_id = l.ID
+            LEFT JOIN `{db_prefix}accounts` a ON s.listing_owner_id = a.ID
+            {$where}
+            ORDER BY s.created_date DESC
+            LIMIT {$offset}, {$limit}
+        ");
+        
+        return $this->db->getAll($sql);
+    }
+    
+    /**
+     * Get quotes for listing owner
+     */
+    public function getQuotesForOwner($account_id, $status = 'all', $start = 0, $limit = 20)
+    {
+        // Get quotes for listings owned by this account
+        $sql = $this->parseSQL("
+            SELECT qs.*, qf.form_name as form_name, l.ID as listing_id, l.title as listing_title,
+                   c.Name as category_name, c.Path as category_path
+            FROM `{db_prefix}quote_submissions` qs
+            LEFT JOIN `{db_prefix}quote_forms` qf ON qs.form_id = qf.id
+            LEFT JOIN `{db_prefix}listings` l ON qs.listing_id = l.ID
+            LEFT JOIN `{db_prefix}categories` c ON l.Category_ID = c.ID
+            WHERE qs.listing_owner_id = '" . addslashes($account_id) . "'
+        ");
+        
+        if ($status !== 'all') {
+            $sql .= " AND qs.status = '" . addslashes($status) . "'";
+        }
+        
+        $sql .= " ORDER BY qs.id DESC";
+        
+        if ($limit > 0) {
+            $sql .= " LIMIT $start, $limit";
+        }
+        
+        $quotes = $this->db->getAll($sql);
+        
+        if ($quotes) {
+            foreach ($quotes as &$quote) {
+                // Parse form data
+                if ($quote['form_data']) {
+                    $quote['form_data_parsed'] = json_decode($quote['form_data'], true);
+                }
+                
+                // Generate listing URL
+                if ($quote['listing_id'] && $quote['listing_title']) {
+                    $quote['listing_url'] = $this->generateListingUrl($quote['listing_title'], $quote['listing_id']);
+                }
+            }
+        }
+        
+        return $quotes;
+    }
+    
+    /**
+     * Get quote count for listing owner
+     */
+    public function getQuoteCountForOwner($account_id, $status = 'all')
+    {
+        $sql = $this->parseSQL("
+            SELECT COUNT(*) as count
+            FROM `{db_prefix}quote_submissions` qs
+            LEFT JOIN `{db_prefix}listings` l ON qs.listing_id = l.ID
+            WHERE qs.listing_owner_id = '" . addslashes($account_id) . "'
+        ");
+        
+        if ($status !== 'all') {
+            $sql .= " AND qs.status = '" . addslashes($status) . "'";
+        }
+        
+        $result = $this->db->getRow($sql);
+        return $result ? (int)$result['count'] : 0;
+    }
+    
+    /**
+     * Get quotes for specific listing
+     */
+    public function getQuotesForListing($listing_id)
+    {
+        $sql = $this->parseSQL("
+            SELECT qs.*, qf.form_name as form_name
+            FROM `{db_prefix}quote_submissions` qs
+            LEFT JOIN `{db_prefix}quote_forms` qf ON qs.form_id = qf.id
+            WHERE qs.listing_id = '" . addslashes($listing_id) . "'
+            ORDER BY qs.id DESC
+        ");
+        
+        $quotes = $this->db->getAll($sql);
+        
+        if ($quotes) {
+            foreach ($quotes as &$quote) {
+                // Parse form data
+                if ($quote['form_data']) {
+                    $quote['form_data_parsed'] = json_decode($quote['form_data'], true);
+                }
+            }
+        }
+        
+        return $quotes;
+    }
+    
+    /**
+     * Mark quote as read
+     */
+    public function markQuoteAsRead($quote_id, $account_id)
+    {
+        // Verify ownership
+        $sql = $this->parseSQL("
+            SELECT id FROM `{db_prefix}quote_submissions` 
+            WHERE id = '" . addslashes($quote_id) . "' 
+            AND listing_owner_id = '" . addslashes($account_id) . "'
+        ");
+        
+        if ($this->db->getRow($sql)) {
+            $update_sql = $this->parseSQL("
+                UPDATE `{db_prefix}quote_submissions` 
+                SET status = 'read' 
+                WHERE id = '" . addslashes($quote_id) . "'
+            ");
+            
+            return $this->db->query($update_sql);
+        }
+        
+        return false;
+    }
+
+    /**
+     * Generate listing URL helper
+     */
+    private function generateListingUrl($title, $listing_id)
+    {
+        // Clean title for URL
+        $cleanTitle = $this->cleanTitle($title);
+        $slug = strtolower($cleanTitle);
+        $slug = str_replace(' ', '-', $slug);
+        $slug = preg_replace('/[^a-z0-9\-]/', '', $slug);
+        $slug = preg_replace('/\-+/', '-', $slug);
+        $slug = trim($slug, '-');
+        
+        return $slug . '-' . $listing_id . '.html';
+    }
+    
+    /**
+     * Clean multilingual title
+     */
+    private function cleanTitle($title)
+    {
+        if (empty($title)) return $title;
+        
+        // Extract Turkish content first
+        if (preg_match('/\{\|tr\|\}(.*?)\{\|\/tr\|\}/', $title, $matches)) {
+            return trim($matches[1]);
+        }
+        
+        // Remove all language tags if Turkish not found
+        $title = preg_replace('/\{\|[a-z]{2}\|\}.*?\{\|\/[a-z]{2}\|\}/', '', $title);
+        return trim($title);
+    }
+} 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 

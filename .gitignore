@@ -1,0 +1,36 @@
+# Environment files
+.env
+.env.local
+.env.production
+
+# Logs
+error_log
+*.log
+
+# Extracted SQL tracked by Git LFS
+# gmoplus_mobil_extracted/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Backup zip (already have SQL)
+gmoplus_mobil.zip
+
+# Temp files (will be regenerated)
+tmp/cache_*/
+tmp/upload/
+
+# User uploaded content (should be backed up separately)
+# files/
+
+# Old/backup files
+*.old
+*.bak
+*.orig

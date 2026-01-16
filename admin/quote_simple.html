@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Quote Management Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .box { padding: 15px; border: 1px solid #ccc; margin: 10px 0; }
+        .success { background: #e8f5e8; border-color: #4caf50; }
+        .error { background: #ffe8e8; border-color: #f44336; }
+    </style>
+</head>
+<body>
+    <h1>Teklif Yönetimi Test Sayfası</h1>
+    
+    <div class="box success">
+        <h3>✓ Temel Erişim Çalışıyor</h3>
+        <p>Bu sayfa görüntülenebiliyorsa admin dizinine erişim var.</p>
+    </div>
+    
+    <div class="box">
+        <h3>Test Linkleri:</h3>
+        <ul>
+            <li><a href="index.php?controller=home">Admin Home</a></li>
+            <li><a href="index.php?controller=quote_management">Quote Management (Ana Link)</a></li>
+            <li><a href="test_quote.php">PHP Test Sayfası</a></li>
+        </ul>
+    </div>
+    
+    <div class="box">
+        <h3>Dosya Kontrolü:</h3>
+        <p>• Controller: controllers/quote_management.inc.php</p>
+        <p>• Template: tpl/controllers/quote_management.tpl</p>
+        <p>• Class: ../includes/classes/rlQuoteSystem.class.php</p>
+    </div>
+    
+    <div class="box">
+        <h3>Olası Sorunlar:</h3>
+        <ul>
+            <li>Flynax admin sistemi controller'ı tanımıyor</li>
+            <li>PHP syntax hatası var</li>
+            <li>Include path problemi</li>
+            <li>Database bağlantı sorunu</li>
+        </ul>
+    </div>
+</body>
+</html> 

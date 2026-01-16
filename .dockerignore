@@ -1,0 +1,43 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Development & Backup
+*.log
+*.zip
+*.sql
+*.bak
+*.old
+*.orig
+error_log
+gmoplus_mobil_extracted/
+
+# Documentation
+README.md
+*.md
+
+# Environment
+.env
+.env.local
+.env.production
+
+# Install directory (production'da gerekli olmayabilir)
+# install/
+
+# Debug files
+debug_*.php
+find_*.php
+check_*.php
+
+# Composer development dependencies (production'da gerekli değil)
+vendor/bin

@@ -1,0 +1,14 @@
+@import "../../../template_core/css/sass/variables"
+@import "../../../template_core/css/sass/mixins"
+@import "../../../template_core/css/sass/media"
+
+.site-guide-card
+    background: var(--bottom-no-sidebar-background-color)
+    padding-bottom: 85%
+    border-radius: 12px
+
+    +respond-to(tablet_only)
+        padding-bottom: 115%
+
+    svg
+        width: 80%

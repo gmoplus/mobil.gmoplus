@@ -1,0 +1,422 @@
+<!-- my listings -->
+
+{if !empty($listings)}
+
+    {if $sorting}
+
+        {php}
+            $types = array('asc' => 'ascending', 'desc' => 'descending'); $this -> assign('sort_types', $types);
+            $sort = array('price', 'number', 'date'); $this -> assign('sf_types', $sort);
+        {/php}
+
+        <div class="grid_navbar">
+            <div class="sorting">
+                <div class="current{if $grid_mode == 'map'} disabled{/if}">
+                    {$lang.sort_by}:
+                    <span class="link">{if $sort_by}{$sorting[$sort_by].name}{else}{$lang.date}{/if}</span>
+                    <span class="arrow"></span>
+                </div>
+                <ul class="fields">
+                    {foreach from=$sorting item='field_item' key='sort_key' name='fSorting'}
+                        {if $field_item.Type|in_array:$sf_types}
+                            {foreach from=$sort_types key='st_key' item='st'}
+                                <li><a rel="nofollow" {if $sort_by == $sort_key && $sort_type == $st_key}class="active"{/if} title="{$lang.sort_listings_by} {$field_item.name} ({$lang[$st]})" href="{if $config.mod_rewrite}?{else}index.php?{$pageInfo.query_string}&{/if}sort_by={$sort_key}&sort_type={$st_key}">{$field_item.name} ({$lang[$st]})</a></li>
+                            {/foreach}
+                        {else}
+                            <li><a rel="nofollow" {if $sort_by == $sort_key}class="active"{/if} title="{$lang.sort_listings_by} {$field_item.name}" href="{if $config.mod_rewrite}?{else}index.php?{$pageInfo.query_string}&{/if}sort_by={$sort_key}&sort_type=asc">{$field_item.name}</a></li>
+                        {/if}
+                    {/foreach}
+                    {rlHook name='myListingsAfterSorting'}
+                </ul>
+            </div>
+        </div>
+    {/if}
+
+    {rlHook name='myListingsBeforeListings'}
+
+    <section id="listings" class="my-listings list">
+        {foreach from=$listings item='listing' key='key'}
+            {if $listing.Subscription_ID}
+                {assign var='hasSubscriptions' value=true}
+            {/if}
+            {include file='blocks'|cat:$smarty.const.RL_DS|cat:'my_listing.tpl'}
+        {/foreach}
+    </section>
+
+    <!-- paging block -->
+    {if $search_results_mode && $refine_search_form}
+        {assign var='myads_paging_url' value=$search_results_url}
+    {else}
+        {assign var='myads_paging_url' value=false}
+    {/if}
+    {paging calc=$pInfo.calc total=$listings|@count current=$pInfo.current per_page=$config.listings_per_page url=$myads_paging_url method=$listing_type.Submit_method}
+    <!-- paging block end -->
+
+    <script class="fl-js-dynamic">{literal}
+        $(document).ready(function(){
+            $('.my-listings .delete').each(function(){
+                $(this).flModal({
+                    caption: '{/literal}{$lang.warning}{literal}',
+                    content: '{/literal}{$lang.notice_delete_listing}{literal}',
+                    prompt: 'xajax_deleteListing('+ $(this).attr('id').split('_')[2] +')',
+                    width: 'auto',
+                    height: 'auto'
+                });
+            });
+
+            {/literal}{if $hasSubscriptions}{literal}
+            $('.my-listings .unsubscription').each(function() {
+                $(this).flModal({
+                    caption: '',
+                    content: '{/literal}{$lang.stripe_unsubscripbe_confirmation}{literal}',
+                    prompt: 'flSubscription.cancelSubscription(\''+ $(this).attr('accesskey').split('-')[2] +'\', \''+ $(this).attr('accesskey').split('-')[0] +'\', '+ $(this).attr('accesskey').split('-')[1] +', false)',
+                    width: 'auto',
+                    height: 'auto'
+                });
+            });
+            {/literal}{/if}{literal}
+
+            $('label.switcher-status input[type="checkbox"]').change(function() {
+                var element = $(this);
+                var id = $(this).val();
+                var status = $(this).is(':checked') ? 'active' : 'approval';
+
+                $.getJSON(
+                    rlConfig['ajax_url'],
+                    {mode: 'changeListingStatus', item: id, value: status, lang: rlLang},
+                    function(response) {
+                        if (response) {
+                            if (response.status == 'ok') {
+                                printMessage('notice', response.message_text);
+                            } else {
+                                printMessage('error', response.message_text);
+                                element.prop('checked', false);
+                            }
+                        }
+                    }
+                );
+            });
+
+            $('label.switcher-featured input[type="checkbox"]').change(function() {
+                var element = $(this);
+                var id = $(this).val();
+                var status = $(this).is(':checked') ? 'featured': 'standard';
+
+                $.getJSON(
+                    rlConfig['ajax_url'],
+                    {mode: 'changeListingFeaturedStatus', item: id, value: status, lang: rlLang},
+                    function(response) {
+                        if (response) {
+                            if (response.status == 'ok') {
+                                if (status == 'featured') {
+                                    $('article#listing_' + id).addClass('featured');
+                                    $('article#listing_'+ id +' div.nav div.info .picture').prepend('<div class="label"><div title="{/literal}{$lang.featured}{literal}">{/literal}{$lang.featured}{literal}</div></div></div>');
+                                } else {
+                                    $('article#listing_'+ id +' div.nav div.info .picture').find('div.label').remove();
+                                    $('article#listing_' + id).removeClass('featured');
+                                }
+                                printMessage('notice', response.message_text);
+                            } else {
+                                printMessage('error', response.message_text);
+                                if (element.is(':checked')) {
+                                    element.prop('checked', false);
+                                } else {
+                                    element.prop('checked', 'checked');
+                                }
+                            }
+                        }
+                    }
+                );
+            });
+            
+            // Quote System - View listing quotes
+            window.viewListingQuotes = function(listingId) {
+                $.ajax({
+                    url: '{/literal}{$rlBase}{literal}quote_ajax.php',
+                    method: 'POST',
+                    data: {
+                        action: 'get_listing_quotes',
+                        listing_id: listingId
+                    },
+                    dataType: 'json',
+                    success: function(response) {
+                                                    if (response.success && response.quotes) {
+                                var html = '<div style="max-height: 600px; overflow-y: auto; color: #333; font-family: Arial, sans-serif;">';
+                                html += '<h4 style="color: #333; margin-bottom: 20px; border-bottom: 2px solid #007bff; padding-bottom: 10px;">İlan Teklifleri (' + response.quotes.length + ')</h4>';
+                                
+                                for (var i = 0; i < response.quotes.length; i++) {
+                                    var quote = response.quotes[i];
+                                    html += '<div style="border: 1px solid #ddd; margin: 15px 0; padding: 20px; border-radius: 8px; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">';
+                                    html += '<div style="display: flex; justify-content: space-between; margin-bottom: 15px; align-items: center;">';
+                                    html += '<strong style="color: #333; font-size: 16px;">👤 ' + quote.requester_name + '</strong>';
+                                    html += '<span style="color: #666; font-size: 12px; background: #f8f9fa; padding: 4px 8px; border-radius: 4px;">ID: ' + (quote.created_at || quote.id) + '</span>';
+                                    html += '</div>';
+                                    
+                                    html += '<div style="margin-bottom: 10px; color: #333;"><strong>📧 Email:</strong> <span style="color: #007bff;">' + quote.requester_email + '</span></div>';
+                                    if (quote.requester_phone) {
+                                        html += '<div style="margin-bottom: 10px; color: #333;"><strong>📞 Telefon:</strong> <span style="color: #28a745;">' + quote.requester_phone + '</span></div>';
+                                    }
+                                    
+                                    if (quote.form_data_parsed) {
+                                        html += '<div style="margin-top: 15px; color: #333;"><strong>📋 Teklif Detayları:</strong></div>';
+                                        html += '<div style="background: #f8f9fa; padding: 15px; margin-top: 8px; border-radius: 6px; border-left: 4px solid #007bff;">';
+                                        
+                                        // Field translations
+                                        var fieldLabels = {
+                                            // Nakliye alanları
+                                            'room_count': 'Oda Sayısı',
+                                            'old_house_access': 'Eski Ev Erişimi',
+                                            'new_house_access': 'Yeni Ev Erişimi',
+                                            'packing_help': 'Paketleme Yardımı',
+                                            'insurance': 'Sigorta',
+                                            'additional_info': 'Ek Bilgiler',
+                                            'old_address_city': 'Eski Adres - İl',
+                                            'old_address_district': 'Eski Adres - İlçe',
+                                            'old_address_neighborhood': 'Eski Adres - Mahalle',
+                                            'new_address_city': 'Yeni Adres - İl',
+                                            'new_address_district': 'Yeni Adres - İlçe',
+                                            'new_address_neighborhood': 'Yeni Adres - Mahalle',
+                                            'moving_time': 'Taşınma Zamanı',
+                                            'moving_date': 'Taşınma Tarihi',
+                                            'moving_time_hour': 'Taşınma Saati',
+                                            // Temizlik alanları
+                                            'house_size': 'Ev Büyüklüğü',
+                                            'bathroom_count': 'Banyo Sayısı',
+                                            'cleaning_hours': 'Temizlik Saati',
+                                            'cleaning_frequency': 'Temizlik Sıklığı',
+                                            'pets': 'Evcil Hayvan',
+                                            'special_notes': 'Özel Notlar',
+                                            'address_city': 'Şehir',
+                                            'address_district': 'İlçe',
+                                            'address_neighborhood': 'Mahalle',
+                                            'address_details': 'Adres Detayları',
+                                            'cleaning_date': 'Temizlik Tarihi',
+                                            // Uluslararası nakliye alanları
+                                            'transport_type': 'Nakliyat Türü',
+                                            'from_country': 'Hangi Ülkeden',
+                                            'to_country': 'Hangi Ülkeye',
+                                            'cargo_volume': 'Eşya Hacmi (m³)',
+                                            'package_volume': 'Gönderi Hacmi',
+                                            'package_weight': 'Ağırlık',
+                                            'cargo_to_country': 'Gönderilecek Ülke',
+                                            'cargo_from_country': 'Gönderen Ülke',
+                                            'cargo_type': 'Kargo Tipi',
+                                            'cargo_notes': 'Kargo Notları',
+                                            'logistics_details': 'Lojistik Detayları',
+                                            'international_cargo_details': 'Uluslararası Kargo Detayları',
+                                            'service_city': 'Hizmet Şehri',
+                                            'service_district': 'Hizmet İlçesi',
+                                            'service_neighborhood': 'Hizmet Mahallesi',
+                                            'when_needed': 'Ne Zaman',
+                                            'specific_date': 'Belirli Tarih',
+                                            // Ortak alanlar
+                                            'full_name': 'Ad Soyad',
+                                            'phone': 'Telefon',
+                                            'email': 'Email',
+                                            'whatsapp_contact': 'WhatsApp İletişimi',
+                                            'details': 'Detaylar'
+                                        };
+                                        
+                                        // Value translations  
+                                        var valueLabels = {
+                                            // Nakliye değerleri
+                                            '1+1': '1+1',
+                                            '2+1': '2+1', 
+                                            '3+1': '3+1',
+                                            '4+1': '4+1',
+                                            '5+1': '5+1',
+                                            'bigger': 'Daha büyük',
+                                            'few_items': 'Sadece birkaç eşya',
+                                            'ground_floor': 'Giriş katında',
+                                            'basement': 'Zemin altında',
+                                            'stairs_1_3': 'Merdiven 1-3 kat',
+                                            'stairs_4_plus': 'Merdiven 4+ kat',
+                                            'building_elevator': 'Bina asansörü',
+                                            'cargo_elevator': 'Yük asansörü',
+                                            'modular_elevator': 'Modüler asansör',
+                                            'all_packing': 'Tüm paketleme',
+                                            'furniture_only': 'Sadece mobilya',
+                                            'no_packing': 'Paketleme yok',
+                                            '20k': '20.000 TL',
+                                            '50k': '50.000 TL',
+                                            '100k': '100.000 TL',
+                                            'within_3_weeks': '3 hafta içinde',
+                                            'within_2_months': '2 ay içinde',
+                                            'within_6_months': '6 ay içinde',
+                                            'just_checking': 'Sadece fiyat bakıyorum',
+                                            // Temizlik değerleri
+                                            '1+0': '1+0',
+                                            '1': '1',
+                                            '2': '2',
+                                            '3': '3',
+                                            '4': '4+',
+                                            '4 saat': '4 saat',
+                                            '5 saat': '5 saat',
+                                            '6 saat': '6 saat',
+                                            '7 saat': '7 saat',
+                                            '8 saat': '8 saat',
+                                            'weekly': 'Haftalık',
+                                            'biweekly': '2 Haftada 1',
+                                            'once': 'Tek Sefer',
+                                            'none': 'Hayır',
+                                            'dog': 'Köpek var',
+                                            'cat': 'Kedi var',
+                                            'both': 'Köpek ve kedi var',
+                                            // Uluslararası nakliye değerleri
+                                            'house_to_house': 'Uluslararası evden eve nakliyat',
+                                            'cargo': 'Yurtdışı kargo',
+                                            'vehicle_transport': 'Uluslararası araç taşıma',
+                                            'logistics': 'Uluslararası lojistik',
+                                            'turkey': 'Türkiye',
+                                            'germany': 'Almanya',
+                                            'netherlands': 'Hollanda',
+                                            'france': 'Fransa',
+                                            'belgium': 'Belçika',
+                                            'usa': 'A.B.D.',
+                                            'uk': 'İngiltere',
+                                            'austria': 'Avusturya',
+                                            'switzerland': 'İsviçre',
+                                            'kktc': 'K.K.T.C.',
+                                            'uae': 'Birleşik Arap Emirlikleri',
+                                            'russia': 'Rusya',
+                                            'italy': 'İtalya',
+                                            'canada': 'Kanada',
+                                            'montenegro': 'Karadağ',
+                                            'sweden': 'İsveç',
+                                            'azerbaijan': 'Azerbaycan',
+                                            '5_or_less': '5 veya daha az',
+                                            '80_or_more': '80 veya daha fazla',
+                                            'very_small': '20 x 10 x 5 cm veya daha az',
+                                            'small': '30 x 20 x 10 cm',
+                                            'medium': '40 x 25 x 10 cm',
+                                            'large': '50 x 27 x 27 cm',
+                                            'xl': '50 x 40 x 40 cm',
+                                            'xxl': '70 x 40 x 40 cm',
+                                            'xxxl': '80 x 60 x 60 cm',
+                                            'huge': '100 x 80 x 80 cm',
+                                            '1m3': '1 m³',
+                                            '2m3': '2 m³',
+                                            '3m3': '3 m³',
+                                            '4m3': '4 m³',
+                                            '5m3_plus': '5 m³ veya daha fazla',
+                                            '0_1kg': '0.1 kg',
+                                            '0_5kg': '0.5 kg',
+                                            '1kg': '1 kg',
+                                            '5kg': '5 kg',
+                                            '10kg': '10 kg',
+                                            '20kg': '20 kg',
+                                            '50kg': '50 kg',
+                                            '100kg': '100 kg',
+                                            '150kg_plus': '150 kg veya daha fazla',
+                                            'personal': 'Özel kargo',
+                                            'commercial': 'Ticari kargo',
+                                            'other': 'Diğer',
+                                            // Ortak değerler
+                                            'no': 'Hayır',
+                                            'yes': 'Evet'
+                                        };
+                                        
+                                        for (var key in quote.form_data_parsed) {
+                                            if (quote.form_data_parsed[key]) {
+                                                var label = fieldLabels[key] || key;
+                                                var value = valueLabels[quote.form_data_parsed[key]] || quote.form_data_parsed[key];
+                                                html += '<div style="margin-bottom: 8px; color: #333;"><strong style="color: #495057;">' + label + ':</strong> <span style="color: #333;">' + value + '</span></div>';
+                                            }
+                                        }
+                                        html += '</div>';
+                                    }
+                                    
+                                    if (quote.quote_message) {
+                                        html += '<div style="margin-top: 15px; color: #333;"><strong>💬 Ek Mesaj:</strong></div>';
+                                        html += '<div style="background: #e8f4fd; padding: 15px; margin-top: 8px; border-radius: 6px; border-left: 4px solid #17a2b8; color: #333; font-style: italic;">' + quote.quote_message + '</div>';
+                                    }
+                                    html += '</div>';
+                                }
+                                html += '</div>';
+                            
+                            // Show in modal - Try multiple modal methods
+                            var modalShown = false;
+                            
+                            // Try flModal first
+                            if (typeof flModal !== 'undefined') {
+                                $(document.body).flModal({
+                                    content: html,
+                                    width: '80%',
+                                    height: '70%',
+                                    caption: 'Teklif Detayları'
+                                });
+                                modalShown = true;
+                            }
+                            // Try jQuery modal if available
+                            else if (typeof $.fn.modal !== 'undefined') {
+                                var modalHtml = '<div class="modal fade" id="quotesModal" tabindex="-1">';
+                                modalHtml += '<div class="modal-dialog modal-lg">';
+                                modalHtml += '<div class="modal-content">';
+                                modalHtml += '<div class="modal-header">';
+                                modalHtml += '<h5 class="modal-title">Teklif Detayları</h5>';
+                                modalHtml += '<button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>';
+                                modalHtml += '</div>';
+                                modalHtml += '<div class="modal-body">' + html + '</div>';
+                                modalHtml += '</div></div></div>';
+                                
+                                $('body').append(modalHtml);
+                                $('#quotesModal').modal('show');
+                                $('#quotesModal').on('hidden.bs.modal', function() {
+                                    $(this).remove();
+                                });
+                                modalShown = true;
+                            }
+                            // Fallback: Simple custom modal
+                            else {
+                                var overlay = '<div id="simple-quotes-modal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; display: flex; align-items: center; justify-content: center;">';
+                                overlay += '<div style="background: white; width: 85%; max-width: 1000px; height: 80%; max-height: 800px; border-radius: 12px; overflow: hidden; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">';
+                                overlay += '<div style="padding: 20px; background: #f8f9fa; border-bottom: 1px solid #dee2e6; display: flex; justify-content: space-between; align-items: center;">';
+                                overlay += '<h5 style="margin: 0; color: #333; font-size: 18px;">📋 Teklif Detayları</h5>';
+                                overlay += '<button onclick="document.getElementById(\'simple-quotes-modal\').remove()" style="background: #dc3545; color: white; border: none; width: 30px; height: 30px; border-radius: 50%; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center;">&times;</button>';
+                                overlay += '</div>';
+                                overlay += '<div style="padding: 25px; overflow-y: auto; height: calc(100% - 80px);">' + html + '</div>';
+                                overlay += '</div></div>';
+                                
+                                $('body').append(overlay);
+                                modalShown = true;
+                            }
+                            
+                            // Mark quotes as read
+                            $.post('{/literal}{$rlBase}{literal}quote_ajax.php', {
+                                action: 'mark_quotes_read',
+                                listing_id: listingId
+                            });
+                            
+                            // Update UI - remove new quote badges
+                            $('#listing_' + listingId + ' .badge').remove();
+                            
+                        } else {
+                            alert('Teklifler yüklenirken hata oluştu.');
+                        }
+                    },
+                    error: function() {
+                        alert('Teklifler yüklenirken hata oluştu.');
+                    }
+                });
+            };
+        });
+        {/literal}
+    </script>
+{else}
+    <div class="info">
+        {if $pages.add_listing}
+            {assign var='link' value='<a href="'|cat:$add_listing_href|cat:'">$1</a>'}
+            {$lang.no_listings_here|regex_replace:'/\[(.+)\]/':$link}
+        {else}
+            {phrase key='no_listings_found_deny_posting' db_check='true'}
+        {/if}
+    </div>
+{/if}
+
+{rlHook name='myListingsBottom'}
+
+{if $hasSubscriptions}
+    {addJS file=$rlTplBase|cat:'js/subscription.js' id='subscription'}
+{/if}
+
+<!-- my listings end -->

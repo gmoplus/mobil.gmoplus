@@ -1,0 +1,400 @@
+<?php
+
+/******************************************************************************
+ *  
+ *  PROJECT: GMO Plus Mobil - Quote System AJAX Handler
+ *  VERSION: 1.0.0
+ *  LICENSE: GMO Plus Internal Use
+ *  DOMAIN: mobil.gmoplus.com
+ *  FILE: quote_ajax.php
+ *  
+ *  AJAX istekleri için handler
+ *  
+ ******************************************************************************/
+
+// Debug mode
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
+
+// Security check and includes first
+if (!defined('RL_DB_HOST')) {
+    // Include Flynax configuration
+    try {
+    require_once dirname(__FILE__) . '/includes/config.inc.php';
+    require_once RL_INC . 'control.inc.php';
+    } catch (Exception $e) {
+        echo json_encode(array(
+            'success' => false,
+            'error' => 'Config loading failed: ' . $e->getMessage()
+        ));
+        exit;
+    }
+}
+
+// Start session after framework load (Flynax handles session)
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Load Flynax classes
+require_once RL_INC . 'classes/rlValid.class.php';
+
+// Load quote system
+require_once RL_INC . 'classes/rlQuoteSystem.class.php';
+
+// Load account info if not already loaded
+if (!isset($account_info) && isset($_SESSION['account']) && $_SESSION['account']['ID']) {
+    $account_info = $_SESSION['account'];
+}
+
+header('Content-Type: application/json');
+
+// CORS headers for development
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type');
+
+// Handle OPTIONS request
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    exit(0);
+}
+
+// Initialize quote system
+$quoteSystem = rlQuoteSystem::getInstance();
+
+// Check if system is enabled
+if (!$quoteSystem->isEnabled()) {
+    echo json_encode(array(
+        'success' => false,
+        'error' => 'Teklif sistemi şu anda aktif değil'
+    ));
+    exit;
+}
+
+$action = $_POST['action'] ?? $_GET['action'] ?? '';
+
+// Debug logging
+error_log("AJAX Quote System - Action: $action");
+error_log("POST data: " . print_r($_POST, true));
+
+try {
+    switch ($action) {
+        
+        case 'get_form':
+            handleGetForm();
+            break;
+            
+        case 'submit_quote':
+            handleSubmitQuote();
+            break;
+            
+        case 'check_availability':
+            handleCheckAvailability();
+            break;
+            
+        case 'get_listing_quotes':
+            handleGetListingQuotes();
+            break;
+            
+        case 'mark_quotes_read':
+            handleMarkQuotesRead();
+            break;
+            
+        default:
+            throw new Exception('Geçersiz işlem: ' . $action);
+    }
+    
+} catch (Exception $e) {
+    error_log("AJAX Quote System Error: " . $e->getMessage());
+    error_log("Stack trace: " . $e->getTraceAsString());
+    echo json_encode(array(
+        'success' => false,
+        'error' => $e->getMessage(),
+        'debug' => array(
+            'action' => $action,
+            'post_data' => $_POST,
+            'file' => $e->getFile(),
+            'line' => $e->getLine(),
+            'trace' => $e->getTraceAsString()
+        )
+    ));
+}
+
+/**
+ * Get quote form for listing
+ */
+function handleGetForm()
+{
+    global $quoteSystem;
+    
+    $listing_id = (int) ($_POST['listing_id'] ?? $_GET['listing_id'] ?? 0);
+    
+    if (!$listing_id) {
+        throw new Exception('İlan ID gerekli');
+    }
+    
+    // Get form using new category-aware method
+    $form = $quoteSystem->getQuoteForm($listing_id);
+    
+    if (!$form) {
+        echo json_encode(array(
+            'success' => false,
+            'error' => 'Bu kategori için teklif formu bulunmuyor'
+        ));
+        return;
+    }
+    
+    error_log("Returning form for listing $listing_id, category: " . $form['listing_info']['category_key']);
+    
+    // Return form data
+    echo json_encode(array(
+        'success' => true,
+        'data' => array(
+            'id' => $form['id'],
+            'title' => $form['name'],
+            'description' => isset($form['description']) ? $form['description'] : '',
+            'fields' => $form['fields'],
+            'category_info' => $form['listing_info']
+        )
+    ));
+}
+
+/**
+ * Submit quote request
+ */
+function handleSubmitQuote()
+{
+    global $quoteSystem;
+    
+    // Validate required data
+    $required_fields = array('form_id', 'listing_id', 'requester_name', 'requester_email');
+    
+    foreach ($required_fields as $field) {
+        if (empty($_POST[$field])) {
+            throw new Exception("'{$field}' alanı zorunludur");
+        }
+    }
+    
+    // Prepare submission data
+    $submission_data = array(
+        'form_id' => (int) $_POST['form_id'],
+        'listing_id' => (int) $_POST['listing_id'],
+        'category_id' => (int) $_POST['category_id'],
+        'requester_name' => trim($_POST['requester_name']),
+        'requester_email' => trim($_POST['requester_email']),
+        'requester_phone' => trim($_POST['requester_phone'] ?? ''),
+        'form_data' => $_POST['form_data'] ?? array()
+    );
+    
+    // Basic validation
+    if (!filter_var($submission_data['requester_email'], FILTER_VALIDATE_EMAIL)) {
+        throw new Exception('Geçerli bir email adresi girin');
+    }
+    
+    // Captcha validation removed for user experience
+    
+    // Submit quote
+    try {
+    $result = $quoteSystem->submitQuote($submission_data);
+    echo json_encode($result);
+    } catch (Exception $e) {
+        error_log("Submit quote failed: " . $e->getMessage());
+        echo json_encode(array(
+            'success' => false,
+            'error' => 'Teklif gönderilirken hata: ' . $e->getMessage(),
+            'debug' => array(
+                'trace' => $e->getTraceAsString()
+            )
+        ));
+    }
+}
+
+/**
+ * Check if quote form is available for listing
+ */
+function handleCheckAvailability()
+{
+    global $quoteSystem;
+    
+    $listing_id = (int) ($_POST['listing_id'] ?? $_GET['listing_id'] ?? 0);
+    
+    if (!$listing_id) {
+        throw new Exception('İlan ID gerekli');
+    }
+    
+    error_log("DEBUG: Check availability called for listing ID: $listing_id");
+    
+    // Get listing category first
+    $category = $quoteSystem->getListingCategory($listing_id);
+    error_log("DEBUG: Category for listing $listing_id: " . print_r($category, true));
+    
+    // Real system check
+    $has_form = $quoteSystem->hasQuoteForm($listing_id);
+    
+    error_log("DEBUG: Has form check result for listing $listing_id: " . ($has_form ? 'true' : 'false'));
+    
+    // If no specific form found, check for 'hizmet' fallback
+    if (!$has_form && $category) {
+        $fallback_form = $quoteSystem->getFormByCategory('hizmet');
+        if ($fallback_form) {
+            $has_form = true;
+            error_log("DEBUG: Using fallback 'hizmet' form for listing $listing_id");
+        }
+    }
+    
+    echo json_encode(array(
+        'success' => true,
+        'data' => array(
+        'available' => $has_form,
+            'listing_id' => $listing_id,
+            'category' => $category,
+            'debug' => array(
+                'original_has_form' => $quoteSystem->hasQuoteForm($listing_id),
+                'final_has_form' => $has_form
+            )
+        )
+    ));
+}
+
+// Captcha functionality removed for better user experience 
+
+/**
+ * Get quotes for a listing (for listing owner)
+ */
+function handleGetListingQuotes()
+{
+    global $quoteSystem, $account_info;
+    
+    $listing_id = (int) ($_POST['listing_id'] ?? $_GET['listing_id'] ?? 0);
+    
+    if (!$listing_id) {
+        throw new Exception('İlan ID gerekli');
+    }
+    
+    // Check if user is logged in and is the listing owner
+    $current_account = null;
+    if (isset($account_info) && $account_info['ID']) {
+        $current_account = $account_info;
+    } elseif (isset($_SESSION['account']) && $_SESSION['account']['ID']) {
+        $current_account = $_SESSION['account'];
+    }
+    
+    if (!$current_account || !$current_account['ID']) {
+        throw new Exception('Oturum açmanız gerekli');
+    }
+    
+    // Verify listing ownership
+    global $rlDb;
+    $listing = $rlDb->getRow("SELECT Account_ID FROM " . RL_DBPREFIX . "listings WHERE ID = $listing_id");
+    
+    if (!$listing || $listing['Account_ID'] != $current_account['ID']) {
+        throw new Exception('Bu ilana ait teklifleri görme yetkiniz yok');
+    }
+    
+    // Get quotes for this listing
+    $quotes = $quoteSystem->getQuotesForListing($listing_id);
+    
+    echo json_encode(array(
+        'success' => true,
+        'quotes' => $quotes
+    ));
+}
+
+/**
+ * Mark quotes as read for a listing
+ */
+function handleMarkQuotesRead()
+{
+    global $quoteSystem, $account_info;
+    
+    $listing_id = (int) ($_POST['listing_id'] ?? $_GET['listing_id'] ?? 0);
+    
+    if (!$listing_id) {
+        throw new Exception('İlan ID gerekli');
+    }
+    
+    // Check if user is logged in
+    $current_account = null;
+    if (isset($account_info) && $account_info['ID']) {
+        $current_account = $account_info;
+    } elseif (isset($_SESSION['account']) && $_SESSION['account']['ID']) {
+        $current_account = $_SESSION['account'];
+    }
+    
+    if (!$current_account || !$current_account['ID']) {
+        throw new Exception('Oturum açmanız gerekli');
+    }
+    
+    // Verify listing ownership
+    global $rlDb;
+    $listing = $rlDb->getRow("SELECT Account_ID FROM " . RL_DBPREFIX . "listings WHERE ID = $listing_id");
+    
+    if (!$listing || $listing['Account_ID'] != $current_account['ID']) {
+        throw new Exception('Bu ilana ait teklifleri işaretleme yetkiniz yok');
+    }
+    
+    // Mark all quotes for this listing as read
+    $sql = "UPDATE " . RL_DBPREFIX . "quote_submissions 
+            SET status = 'read' 
+            WHERE listing_id = $listing_id 
+            AND listing_owner_id = {$current_account['ID']} 
+            AND status = 'new'";
+    
+    $rlDb->query($sql);
+    
+    echo json_encode(array(
+        'success' => true,
+        'message' => 'Teklifler okundu olarak işaretlendi'
+    ));
+}
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
