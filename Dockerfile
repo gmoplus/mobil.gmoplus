@@ -19,17 +19,17 @@ RUN apt-get update && apt-get install -y \
 # Install PHP extensions
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j$(nproc) \
-        gd \
-        mysqli \
-        pdo \
-        pdo_mysql \
-        zip \
-        mbstring \
-        xml \
-        curl \
-        intl \
-        opcache \
-        exif
+    gd \
+    mysqli \
+    pdo \
+    pdo_mysql \
+    zip \
+    mbstring \
+    xml \
+    curl \
+    intl \
+    opcache \
+    exif
 
 # Install Redis extension
 RUN pecl install redis && docker-php-ext-enable redis
@@ -65,7 +65,7 @@ RUN echo '<Directory /var/www/html>\n\
     Options Indexes FollowSymLinks\n\
     AllowOverride All\n\
     Require all granted\n\
-</Directory>' > /etc/apache2/conf-available/custom.conf \
+    </Directory>' > /etc/apache2/conf-available/custom.conf \
     && a2enconf custom
 
 # Set ServerName to suppress Apache warning
@@ -74,8 +74,8 @@ RUN echo "ServerName localhost" >> /etc/apache2/apache2.conf
 # Expose port 80
 EXPOSE 80
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost/ || exit 1
+# Health check - with redirect follow
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD curl -fL http://localhost/index.php || exit 1
 
 CMD ["apache2-foreground"]
