@@ -1,0 +1,63 @@
+RewriteEngine on
+RewriteBase /
+
+# Disable server signature
+ServerSignature Off
+
+# Block sensitive files
+<FilesMatch "\.(inc\.php|tpl|sql|ini)$">
+    Order deny,allow
+    Deny from all
+</FilesMatch>
+
+# Proper handling for SSL behind reverse proxy (Coolify/Traefik)
+<IfModule mod_headers.c>
+    Header always set Content-Security-Policy "upgrade-insecure-requests"
+</IfModule>
+
+# Flynax Core Rewrite Rules
+
+# Templates routing
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_URI} ^/templates
+RewriteRule templates\/(.*?\/)(.*)$ templates/template_core/$2 [L]
+
+# Existing files/directories
+RewriteCond %{REQUEST_FILENAME} -d [OR]
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^.*$ - [L]
+
+# Error pages
+ErrorDocument 404 /index.php
+
+# API
+RewriteRule ^api/v[0-9]+/?.*$ plugins/api/request.php [QSA,L]
+
+# Trailing slash enforce (modified to be protocol-agnostic)
+# RewriteCond %{REQUEST_URI} !(\.[a-z]+|[\/])$ [NC]
+# RewriteRule ^(.*)$ $1/ [R=301,L]
+
+# Listing pages
+RewriteRule ^([^/]+)(/?(.{2,}))?-l?([0-9]+).html$ index.php?page=$1&rlVareables=$3&listing_id=$4 [QSA,L]
+
+# Wildcard / Subdomain support
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{HTTP_HOST} ^([^\.]+)\..+\.+ [NC]
+RewriteCond %{HTTP_HOST} !^www\. [NC]
+RewriteRule (.*) index.php?page=%1&wildcard&rlVareables=$1 [QSA,L]
+
+# Paging
+RewriteRule ^([^//]+)/?(.*)?/index([0-9]*).html$ index.php?page=$1&rlVareables=$2&pg=$3 [QSA,L]
+
+# Account request
+RewriteRule ^((\w{2})/)?([\w\-_]{3,})$ index.php?page=$3&lang=$2&account_request [QSA,L]
+
+# Single pages
+RewriteRule ^([^//]+)/?(^/*)?.html$ index.php?page=$1 [QSA,L]
+
+# Other pages
+RewriteRule ^([^//]+)/?(.*)?/?(.*)?(.html|/+)$ index.php?page=$1&rlVareables=$2 [QSA,L]
+
+# Sitemap
+RewriteRule sitemap.xml$ plugins/sitemap/sitemap.php [QSA,L]
