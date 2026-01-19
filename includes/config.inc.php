@@ -25,6 +25,12 @@
 
 /* define system variables */
 
+// Docker/Coolify Fixes
+ini_set('session.save_path', '/tmp');
+if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {
+    $_SERVER['HTTPS'] = 'on';
+}
+
 define('RL_DS', DIRECTORY_SEPARATOR);
 
 // Debug manager - Environment variables support
