@@ -73,4 +73,9 @@ RUN echo "ServerName localhost" >> /etc/apache2/apache2.conf
 
 # Expose port 80
 EXPOSE 80
+
+# Health check - with redirect follow
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD curl -fL http://localhost/index.php || exit 1
+
 CMD ["apache2-foreground"]
