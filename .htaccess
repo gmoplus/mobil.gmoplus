@@ -181,8 +181,9 @@ RewriteRule ^api/v[0-9]+/?.*$ plugins/api/request.php [QSA,L]
 
 # non trailing redirect
 #RewriteCond %{REQUEST_URI} !(\.[a-z]+|[\\/]|\?.+)$ [NC]
+#Url rewrite fix for trailing slash
 RewriteCond %{REQUEST_URI} !(\.[a-z]+|[\\/])$ [NC]
-RewriteRule ^(.*)$ http://%{HTTP_HOST}%{REQUEST_URI}/ [NC,L,R=301]
+RewriteRule ^(.*)$ %{REQUEST_URI}/ [NC,L,R=301]
 
 # define system languages
 #RewriteRule ^([a-zA-Z]{2})$ index.php?page=$1 [QSA,L]
@@ -199,6 +200,7 @@ RewriteCond %{HTTP_HOST} !^mobil\. [NC]
 RewriteCond %{HTTP_HOST} !^www\. [NC]
 #RewriteCond %{HTTP_HOST} \.{2,} [NC] # 1 is localhost usage, 2 is global usage
 RewriteCond %{HTTP_HOST} ^([^\.]+)\..+\.+ [NC]
+RewriteCond %{HTTP_HOST} !^localhost [NC]
 RewriteCond %{HTTP_HOST} ^([^\.]+) [NC]
 RewriteRule (.*) index.php?page=%1&wildcard&rlVareables=$1 [QSA,L]
 

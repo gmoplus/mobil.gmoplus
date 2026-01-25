@@ -81,8 +81,8 @@ class rlGeoFilter
         $exp_days = (int) $config['mf_geofilter_expiration'];
         $this->cookieTime = strtotime(
             '+' . ($exp_days > 0
-            ? $exp_days
-            : 90) . ' days'
+                ? $exp_days
+                : 90) . ' days'
         );
 
         if (false === defined('REALM')) {
@@ -297,8 +297,8 @@ class rlGeoFilter
         if ($config['mf_multilingual_path']) {
             $path_system = 'Path_' . $config['lang'];
             $path_field  = $get_lang && $rlDb->getOne('ID', "`Code` = '{$get_lang}' AND `Status` = 'active'", 'languages')
-            ? 'Path_' . $get_lang
-            : $path_system;
+                ? 'Path_' . $get_lang
+                : $path_system;
 
             $sql .= ", IF(`{$path_field}` != '', `{$path_field}`, `{$path_system}`) AS `Path`";
         }
@@ -321,7 +321,7 @@ class rlGeoFilter
                 $sql .= "OR REPLACE(`{$path_system}`, '/', '-') = '{$check}'";
             }
         } else {
-            $check = implode('/', array_map(function($var) {
+            $check = implode('/', array_map(function ($var) {
                 return $this->idnToUtf8($var);
             }, $get_vars));
 
@@ -390,12 +390,12 @@ class rlGeoFilter
         }
 
         $this->geo_filter_data['filtering_pages']    = $config['mf_filtering_pages']
-        ? explode(',', $config['mf_filtering_pages'])
-        : [];
+            ? explode(',', $config['mf_filtering_pages'])
+            : [];
 
         $this->geo_filter_data['location_url_pages'] = $config['mf_location_url_pages']
-        ? explode(',', $config['mf_location_url_pages'])
-        : [];
+            ? explode(',', $config['mf_location_url_pages'])
+            : [];
 
         // Set/get session location
         $this->geo_filter_data['from_session'] = false;
@@ -468,11 +468,13 @@ class rlGeoFilter
     {
         global $config, $page_info;
 
-        if (!$this->geo_filter_data['applied_location']
+        if (
+            !$this->geo_filter_data['applied_location']
             || $this->detailsPage
             || $this->searchResultsPage
             || (defined('AJAX_FILE') && AJAX_FILE === true)
             || !$config['mod_rewrite']
+            || strpos($_SERVER['HTTP_HOST'], 'localhost') !== false
         ) {
             return;
         }
@@ -498,7 +500,8 @@ class rlGeoFilter
             $real_url = substr($real_url, 0, $index);
         }
 
-        if (0 !== $this->mbStrcasecmp($request_url, $real_url)
+        if (
+            0 !== $this->mbStrcasecmp($request_url, $real_url)
             && (!$_GET['lang'] || ($_GET['lang'] && $GLOBALS['languages'] && $GLOBALS['languages'][$_GET['lang']]))
         ) {
             // Append query string excepting system variables
@@ -549,7 +552,8 @@ class rlGeoFilter
      * @param  string $str2 - The second string
      * @return int          - `-1` if str1 is less than str2; `1` if str1 is greater than str2, and `0` if they are equal.
      */
-    private function mbStrcasecmp(string $str1, string $str2): int {
+    private function mbStrcasecmp(string $str1, string $str2): int
+    {
         if (function_exists('mb_strtolower')) {
             return strcasecmp(mb_strtolower($str1), mb_strtolower($str2));
         } else {
@@ -719,7 +723,7 @@ class rlGeoFilter
      */
     function parseURL($url, $component = -1)
     {
-        $encodedUrl = preg_replace_callback('%[^:/@?&=#]+%usD', function($matches) {
+        $encodedUrl = preg_replace_callback('%[^:/@?&=#]+%usD', function ($matches) {
             return urlencode($matches[0]);
         }, $url);
 
@@ -802,11 +806,12 @@ class rlGeoFilter
 
         if ($GLOBALS['config']['mod_rewrite']) {
             $this->geo_filter_data['is_location_url'] = in_array($search_page_key, $this->geo_filter_data['location_url_pages'])
-            && !array_search($search_results_url, $_GET, true)
-            && !array_search($advanced_search_url, $_GET, true);
+                && !array_search($search_results_url, $_GET, true)
+                && !array_search($advanced_search_url, $_GET, true);
         }
 
-        if (false !== strpos($_SERVER['REQUEST_URI'], $GLOBALS['search_results_url'])
+        if (
+            false !== strpos($_SERVER['REQUEST_URI'], $GLOBALS['search_results_url'])
             || false !== strpos($_SERVER['REQUEST_URI'], $GLOBALS['advanced_search_url'])
         ) {
             $this->searchResultsPage = true;
@@ -820,7 +825,8 @@ class rlGeoFilter
          * Reset location and try to redirect to the proper URL if saved location path causes 404,
          * but the requested uri is not map,js or css file
          */
-        if ($page_info['Key'] == '404'
+        if (
+            $page_info['Key'] == '404'
             && $this->geo_filter_data['applied_location']
             && $this->geo_filter_data['is_location_url']
             && !preg_match('/\.(map|js|css)$/', $_SERVER['REQUEST_URI'])
@@ -875,7 +881,8 @@ class rlGeoFilter
             );
 
             // Reset location to previous due we can't unset location in rewriteGet() method
-            if ($_COOKIE['mf_geo_location']
+            if (
+                $_COOKIE['mf_geo_location']
                 && $_COOKIE['mf_geo_location'] != 'reset'
                 && (!$this->geo_filter_data['is_location_url'] || $config['mf_account_page_filtration'] == 'url')
             ) {
@@ -940,7 +947,8 @@ class rlGeoFilter
             return [];
         }
 
-        if ($config['mf_popular_locations_level']
+        if (
+            $config['mf_popular_locations_level']
             && isset($this->geo_filter_data['location_listing_fields'][$config['mf_popular_locations_level']])
         ) {
             $last_level = $config['mf_popular_locations_level'];
@@ -952,8 +960,8 @@ class rlGeoFilter
 
         $locale = $requestLang ?: $GLOBALS['config']['lang'];
         $add_where = $this->geo_filter_data['applied_location']
-        ? " AND `T2`.`Key` != '{$this->geo_filter_data['applied_location']['Key']}' "
-        : '';
+            ? " AND `T2`.`Key` != '{$this->geo_filter_data['applied_location']['Key']}' "
+            : '';
 
         $sql = "
             SELECT {$this->selectPathSQL}, `T1`.`{$last_level}` AS `items`, `T2`.`Key`, COUNT(`T1`.`{$last_level}`) AS `count`, `T3`.`Value` AS `name`
@@ -1031,7 +1039,8 @@ class rlGeoFilter
      */
     public function modifyWhere(&$sql, $table = 'listings')
     {
-        if (!$this->geo_filter_data['applied_location']
+        if (
+            !$this->geo_filter_data['applied_location']
             || !$this->geo_filter_data['is_filtering']
         ) {
             return;
@@ -1070,7 +1079,8 @@ class rlGeoFilter
      */
     public function modifyWhereNearby(&$sql, $table = 'listings')
     {
-        if (!$this->geo_filter_data['applied_location']
+        if (
+            !$this->geo_filter_data['applied_location']
             || !$this->geo_filter_data['is_filtering']
         ) {
             return;
@@ -1113,7 +1123,8 @@ class rlGeoFilter
      */
     public function modifyFieldSelect(&$sql, $sqlLastComma = true)
     {
-        if (!$this->geo_filter_data['applied_location']
+        if (
+            !$this->geo_filter_data['applied_location']
             || !$this->geo_filter_data['is_filtering']
         ) {
             return;
@@ -1165,7 +1176,8 @@ class rlGeoFilter
      */
     public function modifyOrder(&$sql)
     {
-        if (!$this->geo_filter_data['applied_location']
+        if (
+            !$this->geo_filter_data['applied_location']
             || !$this->geo_filter_data['is_filtering']
         ) {
             return;
@@ -1188,9 +1200,9 @@ class rlGeoFilter
     public function isNearbySearchReady()
     {
         return $GLOBALS['config']['mf_show_nearby_listings']
-        && $this->geo_filter_data['applied_location']['Latitude'] !== '0'
-        && $this->geo_filter_data['applied_location']['Longitude'] !== '0'
-        && isset($this->geo_filter_data['applied_location']['Latitude']);
+            && $this->geo_filter_data['applied_location']['Latitude'] !== '0'
+            && $this->geo_filter_data['applied_location']['Longitude'] !== '0'
+            && isset($this->geo_filter_data['applied_location']['Latitude']);
     }
 
     /**
@@ -1202,7 +1214,8 @@ class rlGeoFilter
      */
     public function recountAccountListings(&$sql)
     {
-        if (!$this->geo_filter_data['applied_location']
+        if (
+            !$this->geo_filter_data['applied_location']
             || !$this->geo_filter_data['is_filtering']
         ) {
             return;
@@ -1266,7 +1279,7 @@ class rlGeoFilter
             // Prevent replace in "search results" urls
             $search_pattern = $GLOBALS['search_results_url'] . '|' . $GLOBALS['advanced_search_url'];
             $search_pattern = str_replace(['-', '/'], ['\-', '\/'], $search_pattern);
-            $html = preg_replace('/(\"|\')http([^\'\"]+)('. $search_pattern .')([^\'\"]+)?(\.html)?(\"|\')/sm', '"httplocfix$2$3$4"', $html);
+            $html = preg_replace('/(\"|\')http([^\'\"]+)(' . $search_pattern . ')([^\'\"]+)?(\.html)?(\"|\')/sm', '"httplocfix$2$3$4"', $html);
 
             $lang_code = defined('RL_LANG_CODE') ? RL_LANG_CODE : $_REQUEST['lang'];
             $home_url  = defined('SEO_BASE') ? SEO_BASE : RL_URL_HOME;
@@ -1365,7 +1378,8 @@ class rlGeoFilter
             }
         }
         // Get from the categories block on listing type page
-        elseif ($GLOBALS['rlSmarty']->_tpl_vars['categories']
+        elseif (
+            $GLOBALS['rlSmarty']->_tpl_vars['categories']
             && $GLOBALS['rlSmarty']->_tpl_vars['listing_type']['Key'] == $type
         ) {
             return $GLOBALS['rlSmarty']->_tpl_vars['categories'];
@@ -1710,7 +1724,7 @@ class rlGeoFilter
             }
 
             // Prevent displaying the fields in nearby listings
-            foreach($listing['fields'] as &$field) {
+            foreach ($listing['fields'] as &$field) {
                 $field['Details_page'] = false;
             }
         } else {
@@ -1778,7 +1792,8 @@ class rlGeoFilter
      */
     public function hookSmartyFetchHook(&$html, &$resourceName)
     {
-        if ($this->geo_filter_data
+        if (
+            $this->geo_filter_data
             && $GLOBALS['config']['mod_rewrite']
             && $this->geo_format
             && !defined('REALM')
@@ -1838,7 +1853,8 @@ class rlGeoFilter
      */
     public function hookListingsModifyFieldByAccount(&$sql, &$dbcount)
     {
-        if ($this->geo_filter_data['applied_location']
+        if (
+            $this->geo_filter_data['applied_location']
             && $this->geo_filter_data['is_filtering']
             && $GLOBALS['config']['mf_account_page_filtration'] === 'filter'
         ) {
@@ -1885,7 +1901,10 @@ class rlGeoFilter
                         $missing_values = $GLOBALS['rlDb']->fetch(
                             array_keys($missing_keys),
                             ['ID' => $data['ID']],
-                            null, 1, 'listings', 'row'
+                            null,
+                            1,
+                            'listings',
+                            'row'
                         );
                         if ($missing_values) {
                             $data = array_merge($data, $missing_values);
@@ -1899,7 +1918,8 @@ class rlGeoFilter
             if (!$this->isCallFunction('getPersonalAddress') && !$GLOBALS['reefless']->preventUrlModifying) {
                 $page_key = $mode == 'category' ? 'lt_' . $data['Type'] : $data['key'];
 
-                if ($this->geo_filter_data['location_url_pages']
+                if (
+                    $this->geo_filter_data['location_url_pages']
                     && in_array($page_key, $this->geo_filter_data['location_url_pages'])
                 ) {
                     $url = $this->buildUrl($url, $this->geo_filter_data['applied_location'], $custom_lang);
@@ -2120,7 +2140,7 @@ class rlGeoFilter
         $rl_dir = trim(RL_DIR, '/');
 
         if (isset($host)) {
-            $host .= '/'. $rl_dir;
+            $host .= '/' . $rl_dir;
         }
 
         if (strpos(trim($path, '/'), $rl_dir) === 0) {
@@ -2134,14 +2154,14 @@ class rlGeoFilter
      */
     public function hookPhpOriginalUrlRedirect(&$request_uri, &$real_uri, &$real_base, &$request_base)
     {
-        if ($this->geo_filter_data['is_location_url']
+        if (
+            $this->geo_filter_data['is_location_url']
             && $this->geo_filter_data['applied_location']['Path']
         ) {
             if (!is_numeric(strpos($real_uri, $this->geo_filter_data['applied_location']['Path']))) {
                 $real_uri = $this->geo_filter_data['applied_location']['Path'] . '/' . $real_uri;
             }
-        }
-        elseif ($this->detailsPage && $GLOBALS['config']['mf_listing_geo_urls']) {
+        } elseif ($this->detailsPage && $GLOBALS['config']['mf_listing_geo_urls']) {
             global $listing_data;
 
             $real_url = $GLOBALS['reefless']->url('listing', $listing_data);
@@ -2327,17 +2347,19 @@ class rlGeoFilter
         $this->geoUrls           = [];
         $this->multilingualPaths = $config['mf_multilingual_path'] || $config['multilingual_paths'];
         $this->dbListingFields   = is_array($this->geo_filter_data['location_listing_fields'])
-        ? array_keys($this->geo_filter_data['location_listing_fields'])
-        : [];
+            ? array_keys($this->geo_filter_data['location_listing_fields'])
+            : [];
         $this->dbAccountFields   = is_array($this->geo_filter_data['location_account_fields'])
-        ? array_keys($this->geo_filter_data['location_account_fields'])
-        : [];
+            ? array_keys($this->geo_filter_data['location_account_fields'])
+            : [];
 
         $rlDb->outputRowsMap    = ['Key', 'Controller'];
         $this->pagesControllers = $rlDb->fetch(
             ['Key', 'Controller'],
             ['Status' => 'active'],
-            null, null, 'pages'
+            null,
+            null,
+            'pages'
         );
 
         // Reset selected location if it's exist
@@ -2495,7 +2517,7 @@ class rlGeoFilter
 
                 if ($this->multilingualPaths) {
                     foreach ($rlSitemap->languages as $langCode => $langData) {
-                        if ($config['lang'] !== $langCode)  {
+                        if ($config['lang'] !== $langCode) {
                             $this->geoUrls[] = $this->buildUrl(
                                 str_replace('[lang]/', '', $reefless->getPageUrl($page, null, $langCode)),
                                 $location,
@@ -2653,7 +2675,8 @@ class rlGeoFilter
         global $lang;
 
         // Recount listings to build proper rel_prev and rel_next meta tags
-        if (!defined('AJAX_FILE')
+        if (
+            !defined('AJAX_FILE')
             && $this->geo_filter_data['applied_location']
             && $this->geo_filter_data['is_filtering']
             && $GLOBALS['page_info']['Controller'] == 'listing_type'
@@ -2815,7 +2838,8 @@ class rlGeoFilter
      **/
     public function adaptCategories(&$categories)
     {
-        if (!$this->geo_filter_data['applied_location']
+        if (
+            !$this->geo_filter_data['applied_location']
             || !$this->geo_filter_data['is_filtering']
             || ($_POST['xjxfun'] || $GLOBALS['page_info']['Key'] == 'search')
             || !$categories
@@ -2850,8 +2874,8 @@ class rlGeoFilter
 
         if ($category_id) {
             $target_category_id = isset($first_category['Parent_ID']) && $first_category['Parent_ID'] == $GLOBALS['category']['Parent_ID']
-            ? $GLOBALS['category']['Parent_ID'] // Search in current categories level (last level)
-            : $category_id;  // Search in next categories level (child categories level)
+                ? $GLOBALS['category']['Parent_ID'] // Search in current categories level (last level)
+                : $category_id;  // Search in next categories level (child categories level)
             $sql .= "AND FIND_IN_SET({$target_category_id}, `T2`.`Parent_IDs`) > 0 ";
         }
 
@@ -2886,7 +2910,8 @@ class rlGeoFilter
 
             $category['Count'] = $counts[$category['ID']] ? $counts[$category['ID']]['Count'] : 0;
 
-            if ($GLOBALS['rlListingTypes']->types[$category['Type']]['Cat_hide_empty'] === '1'
+            if (
+                $GLOBALS['rlListingTypes']->types[$category['Type']]['Cat_hide_empty'] === '1'
                 && !$category['Count']
             ) {
                 unset($categories[$categoryKey]);
@@ -2920,7 +2945,8 @@ class rlGeoFilter
             return false;
         }
 
-        if ($reefless->isBot()
+        if (
+            $reefless->isBot()
             || $_GET['q'] == 'ext'
             || $_POST['xjxfun']
             || !$config['mf_geo_autodetect']
@@ -2937,13 +2963,14 @@ class rlGeoFilter
         $locations = [];
         $names = [];
 
-        if (!$alternativeCheck
+        if (
+            !$alternativeCheck
             && RL_LANG_CODE != 'en'
             && isset($_SESSION['GEOLocationData']->Country_names)
             && $_SESSION['GEOLocationData']->Country_names[RL_LANG_CODE]
             && $_SESSION['GEOLocationData']->Region_names[RL_LANG_CODE]
             && $_SESSION['GEOLocationData']->City_names[RL_LANG_CODE]
-            && in_array(RL_LANG_CODE, ['es','ru','fr','de','pt'])
+            && in_array(RL_LANG_CODE, ['es', 'ru', 'fr', 'de', 'pt'])
         ) {
             if ($level_number >= 3 && $_SESSION['GEOLocationData']->Country_names) {
                 $names[] = $_SESSION['GEOLocationData']->Country_names[RL_LANG_CODE];
@@ -2999,7 +3026,10 @@ class rlGeoFilter
             $location_to_apply = $rlDb->fetch(
                 '*',
                 array('Key' => $locations[0]['Key'], 'Status' => 'active'),
-                null, null, 'multi_formats', 'row'
+                null,
+                null,
+                'multi_formats',
+                'row'
             );
 
             if (!$location_to_apply) {
@@ -3087,7 +3117,8 @@ class rlGeoFilter
      *
      * @param string $file - File path from script root
      */
-    public function ignoreFileCompilation($file) {
+    public function ignoreFileCompilation($file)
+    {
         $this->noCompileFiles[] = ltrim($file, RL_DS);
     }
 }

@@ -199,6 +199,5 @@ class rlHook
      *
      * Get all active hooks
      **/
-    public function getHooks()
-    {}
+    public function getHooks() {}
 }

@@ -52,6 +52,11 @@ class rlBotBLocker extends Flynax\Abstracts\AbstractPlugin implements Flynax\Int
     {
         global $config, $rlDb, $reefless;
 
+        // Bypass bot blocker for local development
+        if (in_array($_SERVER['REMOTE_ADDR'], ['127.0.0.1', '::1'])) {
+            return;
+        }
+
         if (!$reefless->isBot()) {
             return;
         }

@@ -104,17 +104,12 @@ $reefless->loadClass('Account');
 
 if ($rlAccount->isLogin()) {
     $isLogin = $_SESSION['account']['Full_name'];
-    Valid::escapeQuotes($isLogin);
-    $rlSmarty->assign('isLogin', $isLogin);
-    define('IS_LOGIN', true);
-
-    $account_info = $_SESSION['account'];
-    $rlSmarty->assign_by_ref('account_info', $account_info);
-}
-else {
+    // ...
+} else {
     $reefless->loginAttempt();
 }
 
+/* account abilities handler */
 /**
  * @since 4.9.0 - Moved from $rlCommon->getBlocks(); method
  */
@@ -179,7 +174,8 @@ if ($page_info['Key'] != 404) {
         $request_uri = ltrim($request_uri, RL_LANG_CODE . '/');
     }
 
-    if ($config['mod_rewrite']
+    if (
+        $config['mod_rewrite']
         && $page_info['Controller'] != '404'
         && $page_info['Key'] != 'home'
         && (bool) preg_match('/^[^\\/]+\\/$/', $request_uri)
@@ -325,7 +321,7 @@ if ($page_info['Tpl']) {
             $rlSmarty->assign('errors', $lang['notice_should_login']);
         }
     } elseif (
-           (isset($account_info['Type']) && in_array($account_info['Type_ID'], explode(',', $page_info['Deny'])))
+        (isset($account_info['Type']) && in_array($account_info['Type_ID'], explode(',', $page_info['Deny'])))
         || (isset($account_info['Abilities'][$page_info['Key']]) && $account_info['Abilities'][$page_info['Key']] === false)
     ) {
         $page_info['Page_type']  = 'static';

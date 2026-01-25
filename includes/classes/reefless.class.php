@@ -857,7 +857,10 @@ class reefless extends rlDb
         $host_r = $_SERVER['HTTP_HOST']; // requested host
 
         preg_match('/^(www\.)?(.*)/', $host_s, $matches_s);
-        preg_match('/^(www\.)?(.*)/', $host_r, $matches_r);
+
+        // Strip port from requested host for comparison to avoid redirect loops on localhost
+        $host_r_clean = explode(':', $host_r)[0];
+        preg_match('/^(www\.)?(.*)/', $host_r_clean, $matches_r);
 
         $request_url = $admin ? ADMIN . '/' : ltrim($_SERVER['REQUEST_URI'], '/');
 

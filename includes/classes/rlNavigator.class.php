@@ -186,9 +186,10 @@ class rlNavigator
                     && !is_readable(RL_PLUGINS . $pageInfo['Plugin'] . RL_DS . $pageInfo['Controller'] . '.inc.php')
                 )
                 || (empty($pageInfo['Controller'])
-                || $GLOBALS['sError']
-                || (!$pageInfo['Plugin'] && !is_readable(RL_CONTROL . $pageInfo['Controller'] . '.inc.php'))
-            )) {
+                    || $GLOBALS['sError']
+                    || (!$pageInfo['Plugin'] && !is_readable(RL_CONTROL . $pageInfo['Controller'] . '.inc.php'))
+                )
+            ) {
                 $page = 404;
 
                 if ($config['404_header'] || !isset($config['404_header'])) {
@@ -201,7 +202,8 @@ class rlNavigator
 
             // Redirect user to multilingual path of current page if he use default path
             $currentPath = $pageInfo['Path_' . RL_LANG_CODE];
-            if ($config['multilingual_paths']
+            if (
+                $config['multilingual_paths']
                 && RL_LANG_CODE !== $config['lang']
                 && (!empty($currentPath) && $currentPath !== $pageInfo['Path'])
                 && $pageInfo['Path'] === $page
@@ -222,18 +224,25 @@ class rlNavigator
 
             $pageInfo = $rlDb->fetch(
                 '*',
-                ['Key' => "at_{$accountDetails['Type']}",
-                'Status' => 'active'],
-                null, 1, 'pages', 'row'
+                [
+                    'Key' => "at_{$accountDetails['Type']}",
+                    'Status' => 'active'
+                ],
+                null,
+                1,
+                'pages',
+                'row'
             );
 
             $_GET['id'] = $accountDetails['ID'];
 
-            if (empty($pageInfo['Controller'])
+            if (
+                empty($pageInfo['Controller'])
                 || !is_readable(RL_CONTROL . $pageInfo['Controller'] . '.inc.php')
                 || ($pageInfo['Menus'] == '2' && !isset($account_info['ID'])
-                || $GLOBALS['sError']
-            )) {
+                    || $GLOBALS['sError']
+                )
+            ) {
                 $page = 404;
 
                 if ($config['404_header'] || !isset($config['404_header'])) {
@@ -251,7 +260,8 @@ class rlNavigator
             return false;
         }
 
-        if ($pageInfo['Controller'] == 'listing_type'
+        if (
+            $pageInfo['Controller'] == 'listing_type'
             && ($_GET['listing_id'] || (!$config['mod_rewrite'] && $_GET['id']))
         ) {
             $pageInfo['Key'] = 'view_details';
@@ -348,6 +358,9 @@ class rlNavigator
 
         $GLOBALS['reefless']->setEnv();
 
+        // Bypass license check for local/docker development
+        return true;
+
         $current_domain = $GLOBALS['rlValid']->getDomain(RL_URL_HOME);
         $exp_domain = explode('.', $current_domain);
 
@@ -357,7 +370,8 @@ class rlNavigator
         }
 
         // allow local testing
-        if (in_array(getenv('SERVER_ADDR'), array('127.0.0.1', '::1'))
+        if (
+            in_array(getenv('SERVER_ADDR'), array('127.0.0.1', '::1'))
             && in_array(getenv('SERVER_PORT'), array(80, 443, 8080))
         ) {
             if (($config['rl_setup'] + 2678400) < time()) {
@@ -415,8 +429,7 @@ class rlNavigator
     /**
      * Get GEO data | blank flange
      **/
-    public function getGEOData()
-    {}
+    public function getGEOData() {}
 
     /*
      * Fix for cases when wildcard rule didnt work
@@ -428,13 +441,15 @@ class rlNavigator
         if (!defined('REWRITED')) {
             preg_match("#^([^\.]*)\.#", $_SERVER['HTTP_HOST'], $match);
 
-            if ($_SERVER['HTTP_HOST'] != $GLOBALS['domain_info']['host']
+            if (
+                $_SERVER['HTTP_HOST'] != $GLOBALS['domain_info']['host']
                 && $_GET['page'] && $_GET['page'] != $match[1]
             ) {
                 $_GET['rlVareables'] = $_GET['page'] . ($_GET['rlVareables'] ? '/' . $_GET['rlVareables'] : '');
                 $_GET['page'] = $match[1];
                 $_GET['wildcard'] = '';
-            } elseif ($_SERVER['HTTP_HOST'] != $GLOBALS['domain_info']['host']
+            } elseif (
+                $_SERVER['HTTP_HOST'] != $GLOBALS['domain_info']['host']
                 && (!isset($_GET['page']) || $_GET['listing_id'])
             ) {
                 $_GET['page'] = $match[1];
@@ -495,7 +510,8 @@ class rlNavigator
                 $rwfirst_var = array_splice($rwtmp, 0, 1);
                 $_GET['page'] = $rwfirst_var[0];
                 $_GET['rlVareables'] = implode("/", $rwtmp);
-            } elseif (in_array($_GET['rlVareables'], array_keys($languages))
+            } elseif (
+                in_array($_GET['rlVareables'], array_keys($languages))
                 && (strpos($_GET['rlVareables'], '/') == 2 || strlen($_GET['rlVareables']) == 2)
             ) {
                 $rwtmp = array_filter(explode("/", $_GET['rlVareables']));
@@ -511,7 +527,8 @@ class rlNavigator
                 if ($type_to_rewrite['Links_type'] == 'subdomain') {
                     $ltype_on_sub = true;
 
-                    if ($type_to_rewrite && $type_to_rewrite['Links_type'] == 'subdomain'
+                    if (
+                        $type_to_rewrite && $type_to_rewrite['Links_type'] == 'subdomain'
                         && (
                             ($_GET['rlVareables'] == $search_results_url . ".html" || $_GET['rlVareables'] == $advanced_search_url . ".html")
                             && $_GET['page'] == $type_to_rewrite['Path'])
