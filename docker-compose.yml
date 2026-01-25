@@ -36,9 +36,9 @@ services:
       - MEMCACHE_PORT=${MEMCACHE_PORT:-11211}
     volumes:
       # Persistent storage for uploaded files
-      - ./files:/var/www/html/files
+      # - ./files:/var/www/html/files
       # Persistent storage for temp files and cache
-      - ./tmp:/var/www/html/tmp
+      # - ./tmp:/var/www/html/tmp
     ports:
       - "8082:80"
     networks:
