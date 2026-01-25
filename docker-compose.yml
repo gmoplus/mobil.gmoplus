@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   mobil-gmoplus:
@@ -15,30 +15,30 @@ services:
       - DB_USER=${DB_USER:-gmoplus_mobiluser}
       - DB_PASS=${DB_PASS:-changeme}
       - DB_PREFIX=${DB_PREFIX:-fl_}
-      
+
       # Site Configuration
       - SITE_URL=${SITE_URL:-https://mobil.gmoplus.com}
       - ADMIN_EMAIL=${ADMIN_EMAIL:-gmoplusx@gmail.com}
-      
+
       # Debug (set to false in production)
       - DEBUG=${DEBUG:-false}
       - DB_DEBUG=${DB_DEBUG:-false}
       - AJAX_DEBUG=${AJAX_DEBUG:-false}
-      
+
       # Redis (Optional)
       - REDIS_HOST=${REDIS_HOST:-redis}
       - REDIS_PORT=${REDIS_PORT:-6379}
       - REDIS_USER=${REDIS_USER:-}
       - REDIS_PASS=${REDIS_PASS:-}
-      
+
       # Memcache (Optional)
       - MEMCACHE_HOST=${MEMCACHE_HOST:-127.0.0.1}
       - MEMCACHE_PORT=${MEMCACHE_PORT:-11211}
     volumes:
       # Persistent storage for uploaded files
-      # - ./files:/var/www/html/files
+      - ./files:/var/www/html/files
       # Persistent storage for temp files and cache
-      # - ./tmp:/var/www/html/tmp
+      - ./tmp:/var/www/html/tmp
     ports:
       - "8082:80"
     networks:

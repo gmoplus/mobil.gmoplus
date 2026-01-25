@@ -24,11 +24,12 @@ Thumbs.db
 gmoplus_mobil.zip
 
 # Temp files (will be regenerated)
-tmp/cache_*/
-tmp/upload/
+tmp/
+# tmp/cache_*/
+# tmp/upload/
 
 # User uploaded content (should be backed up separately)
-# files/
+files/
 
 # Old/backup files
 *.old
