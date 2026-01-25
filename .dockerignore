@@ -1,7 +1,8 @@
-maliyet anlizi son 7 gün grfiği gözkmüyor ve daha iri bir grafik aşadaki panolara kaarak bozuyor iyilrştir bunu # Git
+# Git
 .git
-mobil.gmoplus.com/
 .gitignore
+mobil.gmoplus.com/
+backup/
 
 # IDE
 .idea

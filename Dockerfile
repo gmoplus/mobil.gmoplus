@@ -47,7 +47,9 @@ WORKDIR /var/www/html
 COPY . /var/www/html/
 
 # Set proper permissions
-RUN chown -R www-data:www-data /var/www/html \
+# Set proper permissions
+RUN mkdir -p /var/www/html/tmp /var/www/html/files \
+    && chown -R www-data:www-data /var/www/html \
     && chmod -R 755 /var/www/html \
     && chmod -R 777 /var/www/html/tmp \
     && chmod -R 777 /var/www/html/files
