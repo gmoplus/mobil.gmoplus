@@ -57,6 +57,12 @@ class rlBotBLocker extends Flynax\Abstracts\AbstractPlugin implements Flynax\Int
             return;
         }
 
+        // Whitelist helpful bots (Facebook, Bing, Google, etc.) to prevent 403 errors
+        $allowedBots = ['facebookexternalhit', 'meta-externalagent', 'bingbot', 'googlebot', 'Twitterbot', 'LinkedInBot', 'WhatsApp'];
+        if (isset($_SERVER['HTTP_USER_AGENT']) && preg_match('/' . implode('|', $allowedBots) . '/i', $_SERVER['HTTP_USER_AGENT'])) {
+            return;
+        }
+
         if (!$reefless->isBot()) {
             return;
         }
