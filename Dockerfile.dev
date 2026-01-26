@@ -53,6 +53,11 @@ RUN echo '<Directory /var/www/html>\n\
 # Set ServerName to suppress Apache warning
 RUN echo "ServerName localhost" >> /etc/apache2/apache2.conf
 
+# Create tmp directories for Smarty
+RUN mkdir -p /var/www/html/tmp/compile /var/www/html/tmp/aCompile /var/www/html/tmp/cache /var/www/html/tmp/errorLog /var/www/html/tmp/upload \
+    && chown -R www-data:www-data /var/www/html/tmp \
+    && chmod -R 777 /var/www/html/tmp
+
 # Expose port 80
 EXPOSE 80
 
