@@ -1,0 +1,328 @@
+<?php
+
+/******************************************************************************
+ *  
+ *  PROJECT: GMO Plus Mobil - Quote Management Admin
+ *  VERSION: 1.0.0
+ *  LICENSE: GMO Plus Internal Use
+ *  DOMAIN: mobil.gmoplus.com
+ *  
+ *  Admin paneli için teklif yönetim modülü
+ *  
+ ******************************************************************************/
+
+// Check admin access
+if (!defined('ADMIN')) {
+    exit('Access denied');
+}
+
+// Base URL fix - Flynax admin panelinde base URL tanımlı değil
+$base_url = 'https://mobil.gmoplus.com/';
+
+// Debug output başlığında
+// error_log("Quote management controller loaded");
+
+// Function to generate URL slug
+function generateUrlSlug($title, $id) {
+    // Bu örnekte kategori yolunu sabit tutuyoruz
+    // Gerçek sistemde kategori tablosundan çekilebilir
+    $category_path = "hizmetler/tadilat-tamirat-boya/mantolama";
+    
+    // Title'ı URL-friendly hale getir
+    $slug = strtolower($title);
+    $slug = str_replace(' ', '-', $slug);
+    $slug = preg_replace('/[^a-z0-9\-]/', '', $slug);
+    $slug = preg_replace('/\-+/', '-', $slug);
+    $slug = trim($slug, '-');
+    
+    return $category_path . '/' . $slug . '-' . $id . '.html';
+}
+
+// Function to clean multilingual title tags
+function cleanTitle($title) {
+    if (empty($title)) return $title;
+    
+    // İlk olarak Türkçe içeriği bulup çıkartalım
+    if (preg_match('/\{\|tr\|\}(.*?)\{\|\/tr\|\}/', $title, $matches)) {
+        return trim($matches[1]);
+    }
+    
+    // Türkçe bulunamazsa tüm dil tag'lerini temizle
+    $title = preg_replace('/\{\|[a-z]{2}\|\}/', '', $title);
+    $title = preg_replace('/\{\|\/[a-z]{2}\|\}/', '', $title);
+    
+    // Birden fazla boşlukları tek boşluğa çevir
+    $title = preg_replace('/\s+/', ' ', $title);
+    
+    return trim($title);
+}
+
+// Load quote system
+require_once RL_INC . 'classes/rlQuoteSystem.class.php';
+$quoteSystem = rlQuoteSystem::getInstance();
+
+$page_info['name'] = 'quote_management';
+$page_info['title'] = 'Teklif Talepleri Yönetimi';
+
+// Handle actions
+$action = $_GET['action'] ?? '';
+
+// Process POST request for editing
+if ($_POST && isset($_GET['action']) && $_GET['action'] == 'edit' && isset($_GET['id'])) {
+    $id = intval($_GET['id']);
+    
+    try {
+        // Update basic submission data
+        $update_data = array();
+        if (isset($_POST['requester_name'])) $update_data['requester_name'] = $_POST['requester_name'];
+        if (isset($_POST['requester_email'])) $update_data['requester_email'] = $_POST['requester_email'];
+        if (isset($_POST['requester_phone'])) $update_data['requester_phone'] = $_POST['requester_phone'];
+        if (isset($_POST['status'])) $update_data['status'] = $_POST['status'];
+        if (isset($_POST['admin_notes'])) $update_data['admin_notes'] = $_POST['admin_notes'];
+        
+        if (!empty($update_data)) {
+            // SQL query ile güncelleme - PHP addslashes
+            $set_parts = array();
+            foreach ($update_data as $field => $value) {
+                $set_parts[] = "`" . $field . "` = '" . addslashes($value) . "'";
+            }
+            $set_clause = implode(', ', $set_parts);
+            $rlDb->query("UPDATE `" . RL_DBPREFIX . "quote_submissions` SET " . $set_clause . " WHERE `id` = " . $id);
+        }
+        
+        // Update form data if provided
+        if (isset($_POST['form_data']) && is_array($_POST['form_data'])) {
+            // Filter out empty values and preserve existing structure
+            $filtered_form_data = array();
+            foreach ($_POST['form_data'] as $key => $value) {
+                if ($value !== '') {
+                    $filtered_form_data[$key] = $value;
+                }
+            }
+            
+            if (!empty($filtered_form_data)) {
+                $form_data_json = json_encode($filtered_form_data, JSON_UNESCAPED_UNICODE);
+                $escaped_json = addslashes($form_data_json);
+                $rlDb->query("UPDATE `" . RL_DBPREFIX . "quote_submissions` SET `form_data` = '" . $escaped_json . "' WHERE `id` = " . $id);
+            }
+        }
+        
+        $rlSmarty->assign('success_message', 'Teklif başarıyla güncellendi!');
+        
+    } catch (Exception $e) {
+        error_log("Quote update error: " . $e->getMessage());
+        $rlSmarty->assign('error_message', 'Güncelleme hatası: ' . $e->getMessage());
+    }
+}
+
+switch ($action) {
+    case 'view':
+        $page_info['name'] = 'quote_view_submission';
+        $page_info['title'] = 'Teklif Detayları';
+        
+        $submission_id = (int) $_GET['id'];
+        
+        if ($submission_id) {
+            $submission = $rlDb->getRow("SELECT * FROM `" . RL_DBPREFIX . "quote_submissions` WHERE `id` = " . $submission_id);
+            
+            if ($submission) {
+                // Get form
+                if ($submission['form_id']) {
+                    $form = $rlDb->getRow("SELECT * FROM `" . RL_DBPREFIX . "quote_forms` WHERE `id` = " . $submission['form_id']);
+                    $rlSmarty->assign('form', $form);
+                }
+                
+                // Get listing with more details
+                if ($submission['listing_id']) {
+                    $listing = $rlDb->getRow("SELECT `ID`, `title`, `Category_ID` FROM `" . RL_DBPREFIX . "listings` WHERE `ID` = " . $submission['listing_id']);
+                    if ($listing) {
+                        $submission['listing_title'] = cleanTitle($listing['title']);
+                        
+                        // URL'yi dinamik olarak oluştur
+                        $clean_title = cleanTitle($listing['title']);
+                        $url_slug = generateUrlSlug($clean_title, $listing['ID']);
+                        $submission['listing_url'] = 'https://mobil.gmoplus.com/' . $url_slug;
+                    }
+                }
+                
+                // Decode form data
+                if ($submission['form_data']) {
+                    $form_data = json_decode($submission['form_data'], true);
+                    if ($form_data) {
+                        $rlSmarty->assign('form_data', $form_data);
+                    }
+                }
+                
+                // Mark as read if not already
+                if ($submission['status'] != 'read' && $submission['status'] != 'replied') {
+                    $rlDb->query("UPDATE `" . RL_DBPREFIX . "quote_submissions` SET `status` = 'read' WHERE `id` = " . $submission_id);
+                    $submission['status'] = 'read';
+                }
+                
+                $rlSmarty->assign('submission', $submission);
+            } else {
+                $rlSmarty->assign('error_message', 'Teklif bulunamadı');
+            }
+        } else {
+            $rlSmarty->assign('error_message', 'Geçersiz ID');
+            }
+        
+            break;
+            
+    case 'edit':
+        $page_info['name'] = 'quote_edit_submission';
+        $page_info['title'] = 'Teklif Düzenle';
+        
+        $submission_id = (int) $_GET['id'];
+        
+        // Handle form submission
+        if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+            $status = $_POST['status'] ?? '';
+            $notes = $_POST['admin_notes'] ?? '';
+            
+            if (in_array($status, ['new', 'read', 'replied'])) {
+                $update_data = array(
+                    'status' => $status,
+                    'admin_notes' => $notes
+                );
+                
+                // SQL query ile güncelleme
+                $rlDb->query("UPDATE `" . RL_DBPREFIX . "quote_submissions` SET `status` = '" . addslashes($status) . "', `admin_notes` = '" . addslashes($notes) . "' WHERE `id` = " . $submission_id);
+                $rlSmarty->assign('success_message', 'Teklif güncellendi');
+                
+                // Redirect back to view - Doğru admin URL
+                header("Location: index.php?controller=quote_management&action=view&id=" . $submission_id);
+                exit;
+            }
+        }
+        
+        // Load submission for editing
+        if ($submission_id) {
+            $submission = $rlDb->getRow("SELECT * FROM `" . RL_DBPREFIX . "quote_submissions` WHERE `id` = " . $submission_id);
+            
+            if ($submission) {
+                // Get form
+                if ($submission['form_id']) {
+                    $form = $rlDb->getRow("SELECT * FROM `" . RL_DBPREFIX . "quote_forms` WHERE `id` = " . $submission['form_id']);
+                    $rlSmarty->assign('form', $form);
+}
+
+                // Get listing info
+                if ($submission['listing_id']) {
+                    $listing = $rlDb->fetch(array('ID', 'title', 'Category_ID'), array('ID' => $submission['listing_id']), null, 1, 'listings', 'row');
+                    if ($listing) {
+                        $submission['listing_title'] = cleanTitle($listing['title']);
+                        
+                        // URL'yi dinamik olarak oluştur
+                        $clean_title = cleanTitle($listing['title']);
+                        $url_slug = generateUrlSlug($clean_title, $listing['ID']);
+                        $submission['listing_url'] = 'https://mobil.gmoplus.com/' . $url_slug;
+                    }
+                }
+                
+                // Decode form data
+                if ($submission['form_data']) {
+                    $form_data = json_decode($submission['form_data'], true);
+                    if ($form_data) {
+                        $rlSmarty->assign('form_data', $form_data);
+                    }
+                }
+                
+                $rlSmarty->assign('submission', $submission);
+            } else {
+                $rlSmarty->assign('error_message', 'Teklif bulunamadı');
+            }
+        } else {
+            $rlSmarty->assign('error_message', 'Geçersiz ID');
+        }
+        
+        break;
+        
+    case 'forms':
+        include RL_ADMIN . 'controllers' . RL_DS . 'quote_forms_manager.inc.php';
+        break;
+        
+    case 'settings':
+        include RL_ADMIN . 'controllers' . RL_DS . 'quote_settings.inc.php';
+        break;
+        
+    default:
+        // List submissions
+        $limit = 20;
+        $start = ((int) $_GET['pg'] - 1) * $limit;
+        $start = $start < 0 ? 0 : $start;
+        
+        // Get submissions with filters
+        $status_filter = $_GET['status'] ?? '';
+        $form_filter = $_GET['form_id'] ?? '';
+        
+        try {
+            // Flynax fetch metodunu kullanarak basit sorgu (prefix olmadan)
+            $submissions = $rlDb->fetch('*', array(), "ORDER BY `created_date` DESC LIMIT $start, $limit", null, 'quote_submissions');
+            
+            // Debug - log submission count
+            error_log("Quote Management Debug: Found " . count($submissions) . " submissions with fetch method");
+            
+            // Her submission için form ve listing bilgilerini al
+            foreach ($submissions as &$submission) {
+                // Form adını al
+                $form = $rlDb->fetch(array('form_name'), array('id' => $submission['form_id']), null, 1, 'quote_forms');
+                $submission['form_name'] = $form ? $form['form_name'] : 'Bilinmiyor';
+                
+                // Listing başlığını ve URL'ini al
+                if ($submission['listing_id']) {
+                    // Flynax fetch yerine doğrudan SQL kullan
+                    $listing = $rlDb->getRow("SELECT `title` FROM `" . RL_DBPREFIX . "listings` WHERE `ID` = " . $submission['listing_id']);
+                    
+                    if ($listing && $listing['title']) {
+                        $submission['listing_title'] = cleanTitle($listing['title']);
+                        
+                        // URL'yi dinamik olarak oluştur
+                        $clean_title = cleanTitle($listing['title']);
+                        $url_slug = generateUrlSlug($clean_title, $submission['listing_id']);
+                        $submission['listing_url'] = 'https://mobil.gmoplus.com/' . $url_slug;
+                        
+                        // Debug - log successful URL creation
+                        error_log("Debug: Created URL for listing " . $submission['listing_id'] . ": " . $submission['listing_url']);
+                    } else {
+                        $submission['listing_title'] = 'İlan #' . $submission['listing_id'];
+                        $submission['listing_url'] = 'https://mobil.gmoplus.com/listing.php?id=' . $submission['listing_id'];
+                        
+                        // Debug - log fallback URL creation
+                        error_log("Debug: No listing found for ID " . $submission['listing_id'] . ", using fallback URL");
+                    }
+                }
+            }
+            
+            $total_result = $rlDb->getRow("SELECT COUNT(*) as total FROM `" . RL_DBPREFIX . "quote_submissions`");
+            $total = $total_result ? $total_result['total'] : 0;
+            
+            // Debug - log total count  
+            error_log("Quote Management Debug: Total submissions in DB: " . $total);
+            
+            // Get forms for filter
+            $forms = $rlDb->fetch('*', array(), 'ORDER BY `created_date` DESC', null, 'quote_forms');
+            
+            $rlSmarty->assign('submissions', $submissions);
+            $rlSmarty->assign('forms', $forms);
+            $rlSmarty->assign('total', $total);
+            $rlSmarty->assign('status_filter', $status_filter);
+            $rlSmarty->assign('form_filter', $form_filter);
+            
+            // Pagination
+            $pages = $total > 0 ? ceil($total / $limit) : 1;
+            $rlSmarty->assign('pages', $pages);
+            $rlSmarty->assign('current_page', (int) $_GET['pg'] ?: 1);
+            
+        } catch (Exception $e) {
+            error_log("Quote management error: " . $e->getMessage());
+            $rlSmarty->assign('error_message', 'Veriler yüklenirken hata oluştu: ' . $e->getMessage());
+            $rlSmarty->assign('submissions', array());
+            $rlSmarty->assign('forms', array());
+            $rlSmarty->assign('total', 0);
+        }
+        
+        break;
+} 
+
+/* EOF */ 

@@ -1,37 +1,37 @@
-# Environment files
-.env
-.env.local
-.env.production
-
-# Logs
+# Sistem Dosyaları & Loglar
+.DS_Store
+Thumbs.db
 error_log
 *.log
 
-# Extracted SQL tracked by Git LFS
-# gmoplus_mobil_extracted/
+# Büyük Veriler & Kullanıcı Yüklemeleri (Storage'dan gelecek)
+files/
+backup/
+*.sql
+*.zip
+*.tar.gz
+*.rar
 
-# OS files
-.DS_Store
-Thumbs.db
+# Geçici & Cache Dosyaları (tmp içindeki her şeyi yoksay ama .gitkeep kalsın)
+tmp/*
+!tmp/.gitkeep
+gmoplus_mobil_extracted/
+mobil.gmoplus.com/
 
-# IDE
+# Secrets & Environment
+.env
+.env.*
+
+# IDE Dosyaları
 .idea/
 .vscode/
 *.swp
 *.swo
 
-# Backup zip (already have SQL)
-gmoplus_mobil.zip
+# Debug files
+debug_*.php
+check_*.php
+find_*.php
 
-# Temp files (will be regenerated)
-tmp/
-# tmp/cache_*/
-# tmp/upload/
-
-# User uploaded content (should be backed up separately)
-files/
-
-# Old/backup files
-*.old
-*.bak
-*.orig
+# Docker (Local) - Opsiyonel, repo'da kalabilir
+docker-compose.local.yml
