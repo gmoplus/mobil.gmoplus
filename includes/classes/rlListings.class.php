@@ -84,7 +84,8 @@ class rlListings
         $tmp_id = 'tmp' . mt_rand();
 
         /* activation/periods handler TODO */
-        if ($listing['Plan_type'] != 'account' && ((empty($plan_info['Price']) || (defined('REALM') && REALM === 'admin'))
+        if (
+            $listing['Plan_type'] != 'account' && ((empty($plan_info['Price']) || (defined('REALM') && REALM === 'admin'))
                 || ($plan_info['Type'] == 'package' && !empty($plan_info['Listings_remains'])))
         ) {
             $listing['Pay_date'] = "NOW()";
@@ -301,8 +302,8 @@ class rlListings
                             $file_name = 'listing_' . $fk . '_' . time() . mt_rand();
                             $resize_type = $fields[$key]['Default'];
                             $resolution = strtoupper($resize_type) == 'C'
-                            ? explode('|', $fields[$key]['Values'])
-                            : $fields[$key]['Values'];
+                                ? explode('|', $fields[$key]['Values'])
+                                : $fields[$key]['Values'];
 
                             $reefless->loadClass('Actions');
                             $file_name = $rlActions->upload($fk, $file_name, $resize_type, $resolution, 'f', false);
@@ -597,15 +598,16 @@ class rlListings
                             $file_name = 'listing_' . $fk . '_' . time() . mt_rand();
                             $resize_type = $fields[$key]['Default'];
                             $resolution = strtoupper($resize_type) == 'C'
-                            ? explode('|', $fields[$key]['Values'])
-                            : $fields[$key]['Values'];
+                                ? explode('|', $fields[$key]['Values'])
+                                : $fields[$key]['Values'];
 
                             $reefless->loadClass('Actions');
                             $file_name = $rlActions->upload($fk, $file_name, $resize_type, $resolution, 'f', false);
                             $listing['fields'][$fk] = $file_name ?: $data['sys_exist_' . $fk];
 
                             // remove old image when user uploaded a new image
-                            if ($file_name
+                            if (
+                                $file_name
                                 && $data['sys_exist_' . $fk]
                                 && $file_name !== $data['sys_exist_' . $fk]
                             ) {
@@ -643,7 +645,8 @@ class rlListings
                             $listing['fields'][$fk] = $file_name ?: $data['sys_exist_' . $fk];
 
                             // remove old file when user uploaded a new file
-                            if ($file_name
+                            if (
+                                $file_name
                                 && $data['sys_exist_' . $fk]
                                 && $file_name !== $data['sys_exist_' . $fk]
                             ) {
@@ -1042,6 +1045,9 @@ class rlListings
             );
 
             foreach ($fields as &$field) {
+                if (!is_array($field) || !isset($field['Key'])) {
+                    continue;
+                }
                 $field['value'] = $GLOBALS['rlCommon']->adaptValue(
                     $field,
                     $listing[$field['Key']],
@@ -1199,6 +1205,9 @@ class rlListings
             );
 
             foreach ($fields as &$field) {
+                if (!is_array($field) || !isset($field['Key'])) {
+                    continue;
+                }
                 $field['value'] = $rlCommon->adaptValue(
                     $field,
                     $listing[$field['Key']],
@@ -1496,6 +1505,9 @@ class rlListings
             );
 
             foreach ($fields as &$field) {
+                if (!is_array($field) || !isset($field['Key'])) {
+                    continue;
+                }
                 $field['value'] = $GLOBALS['rlCommon']->adaptValue(
                     $field,
                     $listing[$field['Key']],
@@ -2083,8 +2095,7 @@ class rlListings
     /**
      * @deprecated 4.9.3
      **/
-    public function ajaxDeleteListingFile($field, $value, $dom_id)
-    {}
+    public function ajaxDeleteListingFile($field, $value, $dom_id) {}
 
     /**
      * Send link of listing to friend with comment
@@ -2146,7 +2157,8 @@ class rlListings
             $error_fields .= 'your_email,';
         }
 
-        if ($GLOBALS['config']['security_img_tell_friend']
+        if (
+            $GLOBALS['config']['security_img_tell_friend']
             && ($security_code != $_SESSION['ses_security_code'] || !$security_code)
         ) {
             $errors[] = $lang['security_code_incorrect'];
@@ -2390,7 +2402,7 @@ class rlListings
         $saveListingData = !defined('CRON_FILE')
             && (($config['trash'] && !$rlAccount->isAdmin())
                 || ($config['trash'] && $rlAccount->isAdmin() && $_GET['controller'] != 'trash')
-        );
+            );
 
         /**
          * @since 4.9.2
@@ -2815,7 +2827,10 @@ class rlListings
                 'Photos_count',
             ),
             array('ID' => $listing_id),
-            null, null, 'listings', 'row'
+            null,
+            null,
+            'listings',
+            'row'
         );
 
         /**
@@ -3024,9 +3039,11 @@ class rlListings
         $GLOBALS['rlHook']->load('phpListingsUpgradeListing', $plan_info, $plan_id, $listing_id);
 
         // Update listing images count if plan allows less photos then previous plan */
-        if (!$plan_info['Image_unlim']
+        if (
+            !$plan_info['Image_unlim']
             && $plan_info['Image'] < $listing_info['Photos_count']
-            && $plan_info['Type'] != 'featured') {
+            && $plan_info['Type'] != 'featured'
+        ) {
             $photos_count_update = array(
                 'fields' => array(
                     'Photos_count' => $plan_info['Image'],
@@ -3445,8 +3462,7 @@ class rlListings
                     $$f_type_var = $this->getFeatured($f_type, $config['featured_per_page'], $field, $value, $key);
                     $rlSmarty->assign_by_ref($f_type_var, $$f_type_var);
                 } else
-                /* single/default mode */
-                {
+                /* single/default mode */ {
                     $f_type = str_replace('ltfb_', '', $key);
                     $f_type_var = 'featured_' . $f_type;
 
@@ -3554,7 +3570,8 @@ class rlListings
 
         if ($id && $GLOBALS['rlAccount']->isLogin() && $account_info['ID']) {
             if ($delete) {
-                $rlDb->query("
+                $rlDb->query(
+                    "
                     DELETE FROM `{db_prefix}favorites`
                     WHERE `Account_ID` = {$account_info['ID']} AND `Listing_ID` = {$id}"
                 );
@@ -3569,7 +3586,8 @@ class rlListings
                 );
 
                 if (!$info) {
-                    $rlDb->query("
+                    $rlDb->query(
+                        "
                         INSERT INTO `{db_prefix}favorites` (`Account_ID`, `Listing_ID`, `Date`, `IP`)
                         VALUES ({$account_info['ID']}, {$id}, NOW(), '" . Util::getClientIP() . "')"
                     );
@@ -3588,7 +3606,8 @@ class rlListings
     {
         global $pages, $listing_type, $category, $config, $reefless;
 
-        if (!$mode
+        if (
+            !$mode
             || !$data
             || (($config['mod_rewrite'] && is_numeric(strpos($_SERVER['REQUEST_URI'], ':')))
                 || (!$config['mod_rewrite'] && is_numeric(strpos($_SERVER['REQUEST_URI'], '&cf-')))
@@ -3611,7 +3630,8 @@ class rlListings
                     );
                 }
 
-                if ($config['mod_rewrite']
+                if (
+                    $config['mod_rewrite']
                     && $category
                     && !is_numeric(strpos($_SERVER['REQUEST_URI'], '?'))
                     && !(bool) preg_match('/index[0-9]+/', $_SERVER['REQUEST_URI'])
@@ -3630,7 +3650,8 @@ class rlListings
                     $multilingualPath = !empty($data['Path_' . RL_LANG_CODE]) ? $data['Path_' . RL_LANG_CODE] : null;
 
                     // Redirect user to multilingual path of current category if he use default path
-                    if ($multilingualPath
+                    if (
+                        $multilingualPath
                         && false === strpos($_SERVER['QUERY_STRING'], $multilingualPath)
                         && false === strpos($_SERVER['QUERY_STRING'], urlencode($multilingualPath))
                     ) {
@@ -3817,8 +3838,8 @@ class rlListings
         }
 
         $limit = $_REQUEST['device'] == 'mobile'
-        ? ($config['map_search_listings_limit_mobile'] ?: 75)
-        : ($config['map_search_listings_limit'] ?: 500);
+            ? ($config['map_search_listings_limit_mobile'] ?: 75)
+            : ($config['map_search_listings_limit'] ?: 500);
 
         $listings = $GLOBALS['rlSearch']->search($data, $type, 0, $limit);
         $calc = $GLOBALS['rlSearch']->calc;
@@ -4205,7 +4226,10 @@ class rlListings
             $box_info   = $rlDb->fetch(
                 '*',
                 array('ID' => $box_id),
-                null, 1, 'listing_box', 'row'
+                null,
+                1,
+                'listing_box',
+                'row'
             );
             $limit      = $box_info['Count'];
             $next_limit = $limit < 10 ? 10 : $limit;

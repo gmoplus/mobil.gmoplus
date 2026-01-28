@@ -79,4 +79,10 @@ EXPOSE 80
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD curl -fL http://localhost/index.php || exit 1
 
+# Copy and setup entrypoint script
+COPY docker/entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/entrypoint.sh \
+    && sed -i 's/\r$//' /usr/local/bin/entrypoint.sh
+
+ENTRYPOINT ["entrypoint.sh"]
 CMD ["apache2-foreground"]
