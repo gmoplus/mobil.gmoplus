@@ -23,6 +23,12 @@ chmod -R 777 /var/www/html/tmp
 chown -R www-data:www-data /var/www/html/files || true
 chmod -R 777 /var/www/html/files || true
 
+# Generate ASCII aliases for files with encoding issues (idempotent)
+if [ -f /var/www/html/tools/make_ascii_aliases.php ]; then
+    echo "Generating ASCII aliases for mojibake filenames..."
+    php /var/www/html/tools/make_ascii_aliases.php || true
+fi
+
 # Execute the main command
 echo "Executing command: $@"
 exec "$@"
